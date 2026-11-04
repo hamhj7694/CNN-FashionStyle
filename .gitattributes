@@ -1,2 +1,8 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# AI Hub training images are stored outside normal Git history via Git LFS.
+# JSON labels remain regular Git files so they can be inspected and diffed.
+CNN_train_test/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+CNN_train_test/**/*.jpeg filter=lfs diff=lfs merge=lfs -text
+CNN_train_test/**/*.png filter=lfs diff=lfs merge=lfs -text

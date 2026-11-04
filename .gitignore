@@ -6,8 +6,7 @@ __pycache__/
 *.py[cod]
 
 # Local datasets and image assets
-K-Fashion 이미지/
-K-Fashion/
+CNN_train_test/
 recommend_pool/raw_data/images/
 recommend_pool/raw_data/labels/
 recommend_pool/metadata.csv

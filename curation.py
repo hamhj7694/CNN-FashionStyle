@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import os
 import random
@@ -107,6 +108,39 @@ def lazy_crop_item(
     return str(cached_path) if cached_path.is_file() else None
 
 
+def lazy_thumbnail_item(
+    item: dict[str, Any] | pd.Series,
+    cache_dir: str | Path = "recommend_pool/processed_crops",
+    max_size: tuple[int, int] = (1200, 1200),
+) -> str | None:
+    """전신 원본을 비율 유지 축소해 웹용 썸네일로 캐시한다.
+
+    같은 전신 이미지에 여러 바운딩 박스가 있을 수 있으므로 item id가 아니라
+    원본 경로 해시를 캐시 키로 사용해 중복 썸네일 생성을 피한다.
+    """
+
+    record = dict(item)
+    source_path = Path(str(record.get("original_img_path", record.get("image_path", ""))))
+    if not source_path.is_file():
+        return None
+
+    source_key = hashlib.sha1(str(source_path.resolve()).encode("utf-8")).hexdigest()[:16]
+    cache_root = Path(cache_dir)
+    cache_root.mkdir(parents=True, exist_ok=True)
+    cached_path = cache_root / f"full_{source_key}.jpg"
+    if os.path.exists(cached_path):
+        return str(cached_path)
+
+    try:
+        with Image.open(source_path) as source:
+            image = source.convert("RGB")
+            image.thumbnail(max_size, Image.Resampling.LANCZOS)
+            image.save(cached_path, format="JPEG", quality=88, optimize=True)
+    except (OSError, ValueError):
+        return None
+    return str(cached_path) if cached_path.is_file() else None
+
+
 def _sample_records(dataframe: pd.DataFrame, count: int, random_state: int | None) -> list[dict[str, Any]]:
     if dataframe.empty or count <= 0:
         return []
@@ -129,6 +163,8 @@ def get_recommendation_sections(
     filtered = filter_catalog(df_meta, selected_gender, selected_category, selected_mood)
     if filtered.empty:
         return {"similar": [], "discovery": []}
+    if "id" in filtered.columns:
+        filtered = filtered.drop_duplicates(subset=["id"], keep="first")
 
     similar: list[dict[str, Any]] = []
     if user_embedding is not None and item_embeddings is not None:
@@ -149,7 +185,8 @@ def get_recommendation_sections(
 
     similar_ids = {str(item.get("id")) for item in similar}
     remaining = filtered[~filtered["id"].astype(str).isin(similar_ids)] if "id" in filtered else filtered
-    discovery = _sample_records(remaining if not remaining.empty else filtered, discovery_count, random_state)
+    # 후보가 10개보다 적으면 같은 아이템을 다시 보여주지 않고 가능한 만큼만 반환한다.
+    discovery = _sample_records(remaining, discovery_count, random_state)
     return {"similar": similar[:similar_count], "discovery": discovery[:discovery_count]}
 
 
