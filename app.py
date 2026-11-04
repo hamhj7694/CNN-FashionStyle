@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import html
+import io
+import json
 import mimetypes
 from pathlib import Path
 from typing import Any, Iterable
@@ -19,7 +22,14 @@ from curation import (
     lazy_crop_item,
     lazy_thumbnail_item,
 )
-from model import extract_image_embedding, load_feature_extractor
+from model import (
+    EMBEDDING_DIM,
+    EMBEDDING_VERSION,
+    analyze_image,
+    catalog_fingerprint,
+    get_model_signature,
+    load_feature_extractor,
+)
 
 try:
     import streamlit_shadcn_ui as ui
@@ -106,7 +116,7 @@ def _rerun() -> None:
 
 
 @st.cache_data(show_spinner=False)
-def load_metadata() -> tuple[pd.DataFrame, bool]:
+def load_metadata(file_signature: tuple[Any, ...] = ()) -> tuple[pd.DataFrame, bool]:
     for path in METADATA_PATHS:
         if path.is_file():
             return _normalize_metadata(pd.read_csv(path)), False
@@ -257,37 +267,84 @@ def render_card(item: dict[str, Any], section_key: str, index: int) -> None:
         )
 
 @st.cache_resource(show_spinner=False)
-def load_model_safely() -> Any:
+def load_model_safely(signature: tuple[str, int, int]) -> tuple[Any, str]:
     try:
-        return load_feature_extractor()
-    except (NotImplementedError, OSError, ValueError, ImportError):
-        return None
+        return load_feature_extractor(signature[0]), ""
+    except (OSError, ValueError, ImportError, RuntimeError) as exc:
+        return None, str(exc)
 
 
 @st.cache_data(show_spinner=False)
-def load_item_embeddings(dataframe_length: int) -> np.ndarray | None:
+def _load_embedding_file(
+    path: str, file_signature: tuple[int, ...], rows: int, model_id: str, catalog_id: str,
+) -> tuple[np.ndarray | None, str]:
+    # file_signature는 벡터 또는 manifest가 바뀌면 캐시를 갱신하기 위한 인자다.
+    try:
+        index_path = Path(path)
+        manifest = json.loads(index_path.with_suffix(".json").read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            raise ValueError("추천 인덱스 정보의 형식이 올바르지 않습니다.")
+        if (manifest.get("embedding_version") != EMBEDDING_VERSION
+                or manifest.get("checkpoint_sha256") != model_id
+                or manifest.get("catalog_fingerprint") != catalog_id):
+            raise ValueError("추천 후보 정보가 변경되었습니다. 후보 인덱스를 다시 생성해 주세요.")
+        expected_checksum = manifest.get("embedding_sha256")
+        if not expected_checksum:
+            raise ValueError("추천 인덱스 검증 정보가 없습니다. 후보 인덱스를 다시 생성해 주세요.")
+        digest = hashlib.sha256()
+        with index_path.open("rb") as source:
+            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(chunk)
+        if digest.hexdigest() != expected_checksum:
+            raise ValueError("추천 인덱스가 갱신 중이거나 손상되었습니다. 잠시 후 다시 확인해 주세요.")
+        embeddings = np.load(index_path, allow_pickle=False)
+        if (embeddings.shape != (rows, EMBEDDING_DIM)
+                or manifest.get("shape") != list(embeddings.shape)
+                or not np.isfinite(embeddings).all()):
+            raise ValueError("추천 벡터의 개수 또는 차원이 맞지 않습니다.")
+        return embeddings, ""
+    except (OSError, ValueError, TypeError) as exc:
+        return None, str(exc)
+
+
+def load_item_embeddings(dataframe: pd.DataFrame, model: Any) -> tuple[np.ndarray | None, str]:
+    if model is None:
+        return None, ""
+    errors = []
+    fingerprint = catalog_fingerprint(dataframe.to_dict("records"))
     for path in (ROOT / "recommend_pool" / "item_embeddings_web.npy", ROOT / "recommend_pool" / "item_embeddings.npy"):
-        if not path.is_file():
+        manifest_path = path.with_suffix(".json")
+        if not path.is_file() or not manifest_path.is_file():
             continue
         try:
-            embeddings = np.load(path)
-            if embeddings.ndim == 2 and len(embeddings) == dataframe_length:
-                return embeddings
-        except (OSError, ValueError):
-            pass
-    return None
+            signature = tuple(value for file in (path, manifest_path)
+                              for value in (file.stat().st_mtime_ns, file.stat().st_size))
+            embeddings, error = _load_embedding_file(
+                str(path), signature, len(dataframe), model.checkpoint_sha256, fingerprint,
+            )
+            if embeddings is not None:
+                return embeddings, ""
+            errors.append(error)
+        except OSError as exc:
+            errors.append(str(exc))
+    return None, errors[0] if errors else "유사 추천용 후보 인덱스가 아직 없습니다."
 
 
-def extract_user_embedding(uploaded_file: Any, model: Any) -> np.ndarray | None:
+def analyze_upload(uploaded_file: Any, model: Any) -> tuple[dict[str, Any] | None, str]:
     if uploaded_file is None or model is None:
-        return None
+        return None, ""
+    payload = uploaded_file.getvalue()
+    key = (hashlib.sha256(payload).hexdigest(), model.checkpoint_sha256)
+    cached = st.session_state.get("upload_analysis")
+    if cached and cached["key"] == key:
+        return cached["result"], ""
     try:
-        uploaded_file.seek(0)
-        image = Image.open(uploaded_file).convert("RGB")
-        embedding = extract_image_embedding(image, model)
-        return np.asarray(embedding).reshape(-1)
-    except (NotImplementedError, OSError, ValueError, TypeError):
-        return None
+        with Image.open(io.BytesIO(payload)) as image:
+            result = analyze_image(image, model)
+        st.session_state["upload_analysis"] = {"key": key, "result": result}
+        return result, ""
+    except (OSError, ValueError, TypeError, RuntimeError) as exc:
+        return None, f"이미지 분석을 완료하지 못했습니다: {exc}"
 
 
 def _get_query_param(name: str) -> str:
@@ -312,13 +369,16 @@ def apply_query_selection(dataframe: pd.DataFrame) -> None:
     matches = dataframe[dataframe["id"].astype(str) == selected_id]
     if matches.empty:
         return
-    current_id = str(st.session_state.get("selected_item", {}).get("id", ""))
+    current_id = str((st.session_state.get("selected_item") or {}).get("id", ""))
     if current_id != selected_id:
         st.session_state["selected_item"] = matches.iloc[0].to_dict()
     st.session_state["detail_mode"] = "crop" if _get_query_param("view") == "crop" else "full"
 
 
-def render_analysis_panel(uploaded_file: Any, selected_item: dict[str, Any] | None) -> None:
+def render_analysis_panel(
+    uploaded_file: Any, selected_item: dict[str, Any] | None,
+    analysis: dict[str, Any] | None = None, analysis_error: str = "",
+) -> None:
     if selected_item:
         header, close = st.columns([.82, .18])
         with header:
@@ -351,15 +411,31 @@ def render_analysis_panel(uploaded_file: Any, selected_item: dict[str, Any] | No
         return
 
     st.markdown('<div class="mf-panel-title">02 / MOOD DIAGNOSIS</div>', unsafe_allow_html=True)
-    if uploaded_file:
+    if uploaded_file and analysis:
         render_badge("MOOD DETECTED", "mood_detected", dark=True)
-        st.markdown('<div class="mf-analysis"><h3>Modern Minimal</h3><p>정제된 실루엣과 차분한 톤이 만드는 모던 미니멀 무드입니다. 구조적인 아우터와 뉴트럴 아이템을 매칭해 보세요.</p><div class="mf-stat"><span>추천 성별</span><b>공용</b></div><div class="mf-stat"><span>핵심 카테고리</span><b>아우터</b></div></div>', unsafe_allow_html=True)
+        mood = html.escape(analysis["mood"])
+        alternatives = sorted(analysis["mood_scores"].items(), key=lambda item: item[1], reverse=True)[1:3]
+        secondary = html.escape(" · ".join(f"{name} {score:.1%}" for name, score in alternatives))
+        st.markdown(
+            f'<div class="mf-analysis"><h3>{mood}</h3>'
+            '<p>업로드한 착장에서 감지한 패션 무드입니다. 성별과 의류 분류는 아래 필터에서 선택해 보세요.</p>'
+            f'<div class="mf-stat"><span>예측 점수</span><b>{analysis["confidence"]:.1%}</b></div>'
+            f'<div class="mf-stat"><span>함께 감지된 무드</span><b>{secondary}</b></div></div>',
+            unsafe_allow_html=True,
+        )
+    elif uploaded_file:
+        render_badge("ANALYSIS PENDING", "mood_pending")
+        st.info(analysis_error or "학습 완료 후 V4 최고 모델 체크포인트를 저장하면 무드 분석을 사용할 수 있습니다.")
+        if st.button("모델 다시 확인", key="reload_mood_model"):
+            load_model_safely.clear()
+            st.session_state.pop("upload_analysis", None)
+            _rerun()
     else:
         st.markdown('<div class="mf-analysis"><div style="font-size:2.5rem;">✦</div><h3>Start with a look</h3><p>이미지를 업로드하면 무드 진단과 개인화된 아이템 편집이 이곳에 나타납니다.</p></div>', unsafe_allow_html=True)
 
 
 def main() -> None:
-    dataframe, is_demo_data = load_metadata()
+    dataframe, is_demo_data = load_metadata(tuple(get_model_signature(path) for path in METADATA_PATHS))
     uploaded_file = None
 
     st.markdown('<div class="mf-nav"><div class="mf-logo">Mood<span>Fit</span> AI</div><div class="mf-nav-note">Editorial intelligence / 2026</div></div>', unsafe_allow_html=True)
@@ -381,22 +457,41 @@ def main() -> None:
         else:
             st.markdown('<div class="mf-preview-empty" style="margin-top:1rem;"><strong>착장 미리보기</strong><small>상단 Upload 영역에서 이미지를 선택하면<br>이곳에 미리보기가 표시됩니다.</small></div>', unsafe_allow_html=True)
 
-    upload_signature = f"{uploaded_file.name}:{uploaded_file.size}" if uploaded_file else ""
-    if st.session_state.get("upload_signature") != upload_signature:
+    upload_signature = hashlib.sha256(uploaded_file.getvalue()).hexdigest() if uploaded_file else ""
+    previous_upload = st.session_state.get("upload_signature")
+    upload_changed = previous_upload != upload_signature
+    if upload_changed:
         st.session_state["upload_signature"] = upload_signature
         st.session_state["selected_item"] = None
         st.session_state["detail_mode"] = "full"
+        st.session_state.pop("upload_analysis", None)
+        if previous_upload is not None:
+            _clear_query_params()
+
+    model, model_error = None, ""
+    analysis, analysis_error = None, ""
+    if uploaded_file:
+        with st.spinner("착장의 무드를 분석하고 있어요..."):
+            model, model_error = load_model_safely(get_model_signature())
+            analysis, analysis_error = analyze_upload(uploaded_file, model)
 
     apply_query_selection(dataframe)
     selected_item = st.session_state.get("selected_item")
     with right:
-        render_analysis_panel(uploaded_file, selected_item)
+        render_analysis_panel(uploaded_file, selected_item, analysis, analysis_error or model_error)
 
     st.markdown('<div class="mf-section"><div><h2>Explore the edit</h2><p>무드에서 시작해 성별 범위와 의류 분류로 큐레이션을 좁혀보세요.</p></div></div>', unsafe_allow_html=True)
     filter_a, filter_b, filter_c = st.columns([1, 1.25, 1])
     with filter_a:
         mood_options = ["전체"] + sorted([str(value) for value in dataframe["mood"].unique() if str(value)]) if not dataframe.empty else ["전체"]
-        selected_mood = st.selectbox("무드", mood_options, label_visibility="collapsed")
+        # 새 업로드/첫 분석 시 예측 무드를 기본값으로 쓰되 이후 사용자의 변경은 유지한다.
+        diagnosis_key = (upload_signature, model.checkpoint_sha256) if analysis else None
+        if analysis and st.session_state.get("diagnosis_filter_key") != diagnosis_key:
+            st.session_state["mood_filter"] = analysis["mood"] if analysis["mood"] in mood_options else "전체"
+            st.session_state["diagnosis_filter_key"] = diagnosis_key
+        if st.session_state.get("mood_filter", "전체") not in mood_options:
+            st.session_state["mood_filter"] = "전체"
+        selected_mood = st.selectbox("무드", mood_options, key="mood_filter", label_visibility="collapsed")
     with filter_b:
         selected_gender = st.radio("성별", ["전체", "여성 (공용 포함)", "남성 (공용 포함)"], horizontal=True, label_visibility="collapsed")
     with filter_c:
@@ -409,9 +504,10 @@ def main() -> None:
         st.markdown('<div class="mf-empty">추천 데이터가 아직 없습니다. recommend_pool/raw_data/images와 labels를 준비한 뒤 preprocess.py를 실행해 주세요.</div>', unsafe_allow_html=True)
         return
 
-    model = load_model_safely()
-    user_embedding = extract_user_embedding(uploaded_file, model)
-    item_embeddings = load_item_embeddings(len(dataframe))
+    user_embedding = analysis["embedding"] if analysis else None
+    item_embeddings, index_error = load_item_embeddings(dataframe, model)
+    if analysis and index_error:
+        st.info(f"{index_error} 현재는 선택한 필터의 아이템을 둘러볼 수 있습니다.")
     sections = get_recommendation_sections(
         user_embedding,
         selected_category,
@@ -422,7 +518,10 @@ def main() -> None:
         random_state=42,
     )
 
-    st.markdown('<div class="mf-section"><div><h2>AI Similarity</h2><p>입력한 전신 이미지와 가장 가까운 전신 추천</p></div><span class="mf-pill">TOP 5</span></div>', unsafe_allow_html=True)
+    has_similarity = user_embedding is not None and item_embeddings is not None
+    section_title = "AI Similarity" if has_similarity else "Curated Picks"
+    section_description = "입력한 전신 이미지와 가장 가까운 전신 추천" if has_similarity else "선택한 필터에서 발견한 아이템 · 유사도 순위가 아닙니다"
+    st.markdown(f'<div class="mf-section"><div><h2>{section_title}</h2><p>{section_description}</p></div><span class="mf-pill">TOP 5</span></div>', unsafe_allow_html=True)
     similar_items = sections["similar"]
     if similar_items:
         columns = st.columns(5, gap="medium")
