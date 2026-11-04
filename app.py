@@ -18,6 +18,7 @@ import streamlit as st
 from PIL import Image
 
 from curation import (
+    filter_catalog,
     get_recommendation_sections,
     lazy_crop_item,
     lazy_thumbnail_item,
@@ -153,6 +154,29 @@ def load_metadata(file_signature: tuple[Any, ...] = ()) -> tuple[pd.DataFrame, b
                 break
         if rows:
             return _normalize_metadata(pd.DataFrame(rows)), True
+
+    # 정식 metadata CSV가 없어도 준비된 로컬 추천 이미지로 데모 카탈로그를 구성한다.
+    demo_paths = sorted(CROP_DIR.glob("*.jpg"))
+    if demo_paths:
+        rows = []
+        for image_path in demo_paths:
+            rows.append(
+                {
+                    "id": f"local_demo_{image_path.stem}",
+                    "original_img_path": str(image_path),
+                    "original_json_path": "",
+                    "gender": "공용",
+                    "category": "추천 아이템",
+                    "mood": "",
+                    "bbox": "",
+                    "image_url": "",
+                    "full_image_url": "",
+                    "image_path": str(image_path),
+                    "full_image_path": str(image_path),
+                    "crop_image_path": str(image_path),
+                }
+            )
+        return _normalize_metadata(pd.DataFrame(rows)), True
     return _normalize_metadata(pd.DataFrame()), False
 
 
@@ -171,6 +195,78 @@ def _normalize_metadata(dataframe: pd.DataFrame) -> pd.DataFrame:
         if column not in dataframe.columns:
             dataframe[column] = ""
     return dataframe[required].fillna("")
+
+
+@st.cache_data(show_spinner=False)
+def _predict_demo_catalog_moods(
+    image_paths: tuple[str, ...], checkpoint_path: str, checkpoint_sha256: str,
+) -> dict[str, str]:
+    """메타데이터가 없는 데모 추천 이미지에 현재 모델의 무드 라벨을 붙인다."""
+    network = load_feature_extractor(checkpoint_path, device="cpu")
+    predictions: dict[str, str] = {}
+    for image_path in image_paths:
+        try:
+            predictions[image_path] = analyze_image(Path(image_path), network)["mood"]
+        except (OSError, ValueError, RuntimeError):
+            predictions[image_path] = ""
+    return predictions
+
+
+def _attach_demo_moods(dataframe: pd.DataFrame, model: Any) -> pd.DataFrame:
+    """데모 카탈로그에 실제 모델 예측 무드를 추가한다."""
+    if dataframe.empty or "mood" not in dataframe.columns:
+        return dataframe
+    if dataframe["mood"].astype(str).str.strip().ne("").any():
+        return dataframe
+    image_paths = tuple(str(value) for value in dataframe["original_img_path"])
+    predictions = _predict_demo_catalog_moods(
+        image_paths,
+        str(model.checkpoint_path),
+        model.checkpoint_sha256,
+    )
+    labeled = dataframe.copy()
+    labeled["mood"] = [predictions.get(path, "") for path in image_paths]
+    return labeled
+
+
+def _pick_mood_recommendations(
+    dataframe: pd.DataFrame, mood_scores: dict[str, float], count: int = 5,
+) -> dict[str, list[dict[str, Any]]]:
+    """Top-1 무드 5개와 Top-2/3 무드 5개를 랜덤하게 선택한다."""
+    ranked_moods = [
+        mood for mood, _ in sorted(mood_scores.items(), key=lambda item: item[1], reverse=True)
+    ]
+    if dataframe.empty or not ranked_moods:
+        return {"similar": [], "discovery": []}
+
+    def sample_pool(pool: pd.DataFrame, amount: int, used_ids: set[str]) -> list[dict[str, Any]]:
+        if pool.empty or amount <= 0:
+            return []
+        if "id" in pool.columns:
+            pool = pool[~pool["id"].astype(str).isin(used_ids)]
+        if pool.empty:
+            return []
+        sampled = pool.sample(n=min(amount, len(pool)), random_state=None)
+        return sampled.to_dict("records")
+
+    used_ids: set[str] = set()
+    top1_pool = dataframe[dataframe["mood"] == ranked_moods[0]]
+    top1 = sample_pool(top1_pool, count, used_ids)
+    used_ids.update(str(item.get("id")) for item in top1)
+    if len(top1) < count:
+        fallback = sample_pool(dataframe, count - len(top1), used_ids)
+        top1.extend(fallback)
+        used_ids.update(str(item.get("id")) for item in fallback)
+
+    top23_moods = set(ranked_moods[1:3])
+    top23_pool = dataframe[dataframe["mood"].isin(top23_moods)]
+    top23 = sample_pool(top23_pool, count, used_ids)
+    used_ids.update(str(item.get("id")) for item in top23)
+    if len(top23) < count:
+        fallback = sample_pool(dataframe, count - len(top23), used_ids)
+        top23.extend(fallback)
+
+    return {"similar": top1[:count], "discovery": top23[:count]}
 
 
 def _first_source(item: dict[str, Any], fields: Iterable[str]) -> str:
@@ -474,6 +570,8 @@ def main() -> None:
         with st.spinner("착장의 무드를 분석하고 있어요..."):
             model, model_error = load_model_safely(get_model_signature())
             analysis, analysis_error = analyze_upload(uploaded_file, model)
+    if analysis and is_demo_data and model is not None:
+        dataframe = _attach_demo_moods(dataframe, model)
 
     apply_query_selection(dataframe)
     selected_item = st.session_state.get("selected_item")
@@ -506,7 +604,7 @@ def main() -> None:
 
     user_embedding = analysis["embedding"] if analysis else None
     item_embeddings, index_error = load_item_embeddings(dataframe, model)
-    if analysis and index_error:
+    if not analysis and index_error:
         st.info(f"{index_error} 현재는 선택한 필터의 아이템을 둘러볼 수 있습니다.")
     sections = get_recommendation_sections(
         user_embedding,
@@ -521,6 +619,23 @@ def main() -> None:
     has_similarity = user_embedding is not None and item_embeddings is not None
     section_title = "AI Similarity" if has_similarity else "Curated Picks"
     section_description = "입력한 전신 이미지와 가장 가까운 전신 추천" if has_similarity else "선택한 필터에서 발견한 아이템 · 유사도 순위가 아닙니다"
+    if analysis:
+        # 기본으로 선택된 Top-1 무드는 전체 후보를 대상으로 Top-1/2/3를 나눠 추천한다.
+        effective_mood = "전체" if selected_mood == analysis["mood"] else selected_mood
+        recommendation_pool = filter_catalog(
+            dataframe,
+            selected_gender=selected_gender,
+            selected_category=selected_category,
+            selected_mood=effective_mood,
+        )
+        sections = _pick_mood_recommendations(
+            recommendation_pool,
+            analysis["mood_scores"],
+            count=5,
+        )
+        has_similarity = False
+        section_title = "AI Mood Picks"
+        section_description = f"{analysis['mood']} Top-1 무드 5개 + Top-2·3 무드 5개"
     st.markdown(f'<div class="mf-section"><div><h2>{section_title}</h2><p>{section_description}</p></div><span class="mf-pill">TOP 5</span></div>', unsafe_allow_html=True)
     similar_items = sections["similar"]
     if similar_items:
