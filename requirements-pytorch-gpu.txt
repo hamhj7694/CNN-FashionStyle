@@ -1,0 +1,13 @@
+# PyTorch GPU environment for CNN_model_PyTorch.ipynb
+# Python 3.12 recommended.
+# Install the CUDA wheels with:
+# python -m pip install -r requirements.txt
+# python -m pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
+# The explicit CUDA index below prevents a CPU-only torch wheel from being selected.
+
+--extra-index-url https://download.pytorch.org/whl/cu124
+
+-r requirements.txt
+
+torch==2.6.0+cu124
+torchvision==0.21.0+cu124

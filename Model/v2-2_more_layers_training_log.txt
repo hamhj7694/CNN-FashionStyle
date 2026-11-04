@@ -1,0 +1,33 @@
+
+
+====================================================================================================
+V2-2: loaded epoch 25, additional epochs 20
+====================================================================================================
+
+
+====================================================================================================
+V2-2: loaded epoch 25, additional epochs 20
+====================================================================================================
+Epoch [26] | Train Loss: 1.0035 | Train Acc: 68.45% | Val Loss: 2.0954 | Val Acc: 32.10% | Val Macro F1: 0.2180 | Val Balanced Acc: 36.13%
+Epoch [27] | Train Loss: 0.9947 | Train Acc: 68.64% | Val Loss: 2.0927 | Val Acc: 32.36% | Val Macro F1: 0.2199 | Val Balanced Acc: 36.09%
+Epoch [28] | Train Loss: 0.9936 | Train Acc: 68.39% | Val Loss: 2.0927 | Val Acc: 32.34% | Val Macro F1: 0.2199 | Val Balanced Acc: 36.08%
+Epoch [29] | Train Loss: 0.9836 | Train Acc: 69.02% | Val Loss: 2.0760 | Val Acc: 33.00% | Val Macro F1: 0.2234 | Val Balanced Acc: 36.05%
+Epoch [30] | Train Loss: 0.9806 | Train Acc: 68.89% | Val Loss: 2.0937 | Val Acc: 32.30% | Val Macro F1: 0.2212 | Val Balanced Acc: 36.01%
+Epoch [31] | Train Loss: 0.9633 | Train Acc: 69.81% | Val Loss: 2.0740 | Val Acc: 32.93% | Val Macro F1: 0.2234 | Val Balanced Acc: 36.13%
+Epoch [32] | Train Loss: 0.9611 | Train Acc: 69.64% | Val Loss: 2.0849 | Val Acc: 32.61% | Val Macro F1: 0.2230 | Val Balanced Acc: 36.32%
+Epoch [33] | Train Loss: 0.9551 | Train Acc: 69.61% | Val Loss: 2.0773 | Val Acc: 32.86% | Val Macro F1: 0.2222 | Val Balanced Acc: 35.87%
+Epoch [34] | Train Loss: 0.9507 | Train Acc: 70.07% | Val Loss: 2.0770 | Val Acc: 32.92% | Val Macro F1: 0.2261 | Val Balanced Acc: 36.33%
+Epoch [35] | Train Loss: 0.9541 | Train Acc: 69.99% | Val Loss: 2.0979 | Val Acc: 32.32% | Val Macro F1: 0.2260 | Val Balanced Acc: 36.15%
+Epoch [36] | Train Loss: 0.9343 | Train Acc: 70.09% | Val Loss: 2.0528 | Val Acc: 33.80% | Val Macro F1: 0.2310 | Val Balanced Acc: 35.65%
+Epoch [37] | Train Loss: 0.9366 | Train Acc: 70.04% | Val Loss: 2.0505 | Val Acc: 33.66% | Val Macro F1: 0.2259 | Val Balanced Acc: 35.95%
+Epoch [38] | Train Loss: 0.9292 | Train Acc: 70.50% | Val Loss: 2.0580 | Val Acc: 33.52% | Val Macro F1: 0.2261 | Val Balanced Acc: 36.03%
+Epoch [39] | Train Loss: 0.9228 | Train Acc: 70.52% | Val Loss: 2.0753 | Val Acc: 32.94% | Val Macro F1: 0.2261 | Val Balanced Acc: 35.77%
+Epoch [40] | Train Loss: 0.9163 | Train Acc: 70.76% | Val Loss: 2.0770 | Val Acc: 32.94% | Val Macro F1: 0.2280 | Val Balanced Acc: 35.53%
+Epoch [41] | Train Loss: 0.9290 | Train Acc: 70.41% | Val Loss: 2.0438 | Val Acc: 34.15% | Val Macro F1: 0.2309 | Val Balanced Acc: 35.93%
+Epoch [42] | Train Loss: 0.9138 | Train Acc: 70.97% | Val Loss: 2.0556 | Val Acc: 33.64% | Val Macro F1: 0.2321 | Val Balanced Acc: 36.07%
+Epoch [43] | Train Loss: 0.9076 | Train Acc: 71.15% | Val Loss: 2.0288 | Val Acc: 34.60% | Val Macro F1: 0.2343 | Val Balanced Acc: 35.83%
+
+
+====================================================================================================
+V2-2: loaded epoch 25, additional epochs 20
+====================================================================================================

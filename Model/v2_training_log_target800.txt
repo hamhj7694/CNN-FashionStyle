@@ -1,0 +1,16 @@
+V2 training log (target_per_class=800)
+==========================================================================================
+Epoch [12/100] | Train Loss: 1.1989 | Train Acc: 63.20% | Val Loss: 2.1967 | Val Acc: 28.09% | Val Macro F1: 0.1887 | Val Balanced Acc: 34.91%
+Epoch [13/100] | Train Loss: 1.1780 | Train Acc: 63.72% | Val Loss: 2.1864 | Val Acc: 28.42% | Val Macro F1: 0.1929 | Val Balanced Acc: 34.83%
+Epoch [14/100] | Train Loss: 1.1513 | Train Acc: 64.44% | Val Loss: 2.1847 | Val Acc: 28.72% | Val Macro F1: 0.1986 | Val Balanced Acc: 34.73%
+Epoch [15/100] | Train Loss: 1.1255 | Train Acc: 64.94% | Val Loss: 2.1467 | Val Acc: 29.88% | Val Macro F1: 0.1974 | Val Balanced Acc: 34.75%
+Epoch [16/100] | Train Loss: 1.1081 | Train Acc: 65.46% | Val Loss: 2.1588 | Val Acc: 29.62% | Val Macro F1: 0.1997 | Val Balanced Acc: 34.89%
+Epoch [17/100] | Train Loss: 1.0952 | Train Acc: 65.97% | Val Loss: 2.1434 | Val Acc: 30.11% | Val Macro F1: 0.2036 | Val Balanced Acc: 35.17%
+Epoch [18/100] | Train Loss: 1.0750 | Train Acc: 66.40% | Val Loss: 2.1483 | Val Acc: 29.76% | Val Macro F1: 0.2043 | Val Balanced Acc: 35.06%
+Epoch [19/100] | Train Loss: 1.0598 | Train Acc: 66.79% | Val Loss: 2.1378 | Val Acc: 30.40% | Val Macro F1: 0.2077 | Val Balanced Acc: 35.42%
+Epoch [20/100] | Train Loss: 1.0440 | Train Acc: 67.69% | Val Loss: 2.1027 | Val Acc: 31.38% | Val Macro F1: 0.2110 | Val Balanced Acc: 35.50%
+Epoch [21/100] | Train Loss: 1.0213 | Train Acc: 68.25% | Val Loss: 2.0999 | Val Acc: 31.40% | Val Macro F1: 0.2127 | Val Balanced Acc: 35.33%
+Epoch [22/100] | Train Loss: 1.0098 | Train Acc: 68.17% | Val Loss: 2.0883 | Val Acc: 32.04% | Val Macro F1: 0.2126 | Val Balanced Acc: 35.07%
+Epoch [23/100] | Train Loss: 0.9902 | Train Acc: 68.84% | Val Loss: 2.1492 | Val Acc: 30.29% | Val Macro F1: 0.2128 | Val Balanced Acc: 35.43%
+Epoch [24/100] | Train Loss: 0.9695 | Train Acc: 69.69% | Val Loss: 2.0893 | Val Acc: 31.97% | Val Macro F1: 0.2157 | Val Balanced Acc: 35.29%
+Epoch [25/100] | Train Loss: 0.9672 | Train Acc: 69.57% | Val Loss: 2.0908 | Val Acc: 32.28% | Val Macro F1: 0.2200 | Val Balanced Acc: 35.23%

@@ -1,0 +1,9 @@
+
+
+====================================================================================================
+V3 run: street cap = 10,000, epochs = 100
+====================================================================================================
+Epoch [1/100] | Train Loss: 2.2564 | Train Acc: 29.82% | Val Loss: 1.9035 | Val Acc: 42.28% | Val Macro F1: 0.1013 | Val Balanced Acc: 11.59%
+Epoch [2/100] | Train Loss: 2.0261 | Train Acc: 35.29% | Val Loss: 1.7424 | Val Acc: 46.37% | Val Macro F1: 0.1301 | Val Balanced Acc: 13.65%
+Epoch [3/100] | Train Loss: 1.9370 | Train Acc: 37.37% | Val Loss: 1.6944 | Val Acc: 46.99% | Val Macro F1: 0.1551 | Val Balanced Acc: 15.73%
+Epoch [4/100] | Train Loss: 1.8757 | Train Acc: 39.10% | Val Loss: 1.6718 | Val Acc: 47.78% | Val Macro F1: 0.1736 | Val Balanced Acc: 17.69%

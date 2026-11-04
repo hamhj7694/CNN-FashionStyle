@@ -1,0 +1,45 @@
+V2 Training Log (recovered from CNN_model_PyTorch2.ipynb)
+=========================================================
+
+Epoch [1/100] | Train Loss: 2.2784 | Train Acc: 31.96% | Val Loss: 2.5942 | Val Acc: 19.53% | Val Macro F1: 0.1232 | Val Balanced Acc: 28.81%
+Epoch [2/100] | Train Loss: 2.1819 | Train Acc: 34.62% | Val Loss: 2.7340 | Val Acc: 13.66% | Val Macro F1: 0.1114 | Val Balanced Acc: 31.09%
+Epoch [3/100] | Train Loss: 2.1176 | Train Acc: 36.82% | Val Loss: 2.7217 | Val Acc: 15.29% | Val Macro F1: 0.1161 | Val Balanced Acc: 30.73%
+Epoch [4/100] | Train Loss: 2.0571 | Train Acc: 38.10% | Val Loss: 2.6144 | Val Acc: 17.64% | Val Macro F1: 0.1268 | Val Balanced Acc: 31.65%
+Epoch [5/100] | Train Loss: 1.9942 | Train Acc: 40.50% | Val Loss: 2.5703 | Val Acc: 16.47% | Val Macro F1: 0.1255 | Val Balanced Acc: 31.37%
+Epoch [6/100] | Train Loss: 1.9629 | Train Acc: 41.22% | Val Loss: 2.5848 | Val Acc: 17.97% | Val Macro F1: 0.1278 | Val Balanced Acc: 32.71%
+Epoch [7/100] | Train Loss: 1.9181 | Train Acc: 41.78% | Val Loss: 2.6353 | Val Acc: 16.05% | Val Macro F1: 0.1267 | Val Balanced Acc: 32.80%
+Epoch [8/100] | Train Loss: 1.8960 | Train Acc: 42.74% | Val Loss: 2.5090 | Val Acc: 18.75% | Val Macro F1: 0.1365 | Val Balanced Acc: 33.29%
+Epoch [9/100] | Train Loss: 1.8545 | Train Acc: 44.21% | Val Loss: 2.4431 | Val Acc: 20.64% | Val Macro F1: 0.1437 | Val Balanced Acc: 32.67%
+Epoch [10/100] | Train Loss: 1.8287 | Train Acc: 44.74% | Val Loss: 2.5539 | Val Acc: 17.46% | Val Macro F1: 0.1369 | Val Balanced Acc: 32.61%
+Epoch [11/100] | Train Loss: 1.7890 | Train Acc: 45.74% | Val Loss: 2.5042 | Val Acc: 19.82% | Val Macro F1: 0.1427 | Val Balanced Acc: 33.72%
+Epoch [12/100] | Train Loss: 1.7629 | Train Acc: 46.76% | Val Loss: 2.4744 | Val Acc: 19.62% | Val Macro F1: 0.1407 | Val Balanced Acc: 33.82%
+Epoch [13/100] | Train Loss: 1.7463 | Train Acc: 46.82% | Val Loss: 2.5269 | Val Acc: 18.82% | Val Macro F1: 0.1389 | Val Balanced Acc: 33.54%
+Epoch [14/100] | Train Loss: 1.7271 | Train Acc: 48.08% | Val Loss: 2.4103 | Val Acc: 20.94% | Val Macro F1: 0.1455 | Val Balanced Acc: 33.52%
+Epoch [15/100] | Train Loss: 1.6937 | Train Acc: 48.01% | Val Loss: 2.4706 | Val Acc: 20.25% | Val Macro F1: 0.1420 | Val Balanced Acc: 32.86%
+Epoch [16/100] | Train Loss: 1.6766 | Train Acc: 48.77% | Val Loss: 2.5489 | Val Acc: 18.33% | Val Macro F1: 0.1351 | Val Balanced Acc: 33.39%
+Epoch [17/100] | Train Loss: 1.6471 | Train Acc: 49.59% | Val Loss: 2.4594 | Val Acc: 19.42% | Val Macro F1: 0.1388 | Val Balanced Acc: 33.46%
+Epoch [18/100] | Train Loss: 1.6461 | Train Acc: 49.68% | Val Loss: 2.4046 | Val Acc: 20.75% | Val Macro F1: 0.1453 | Val Balanced Acc: 33.44%
+Epoch [19/100] | Train Loss: 1.6192 | Train Acc: 51.08% | Val Loss: 2.4290 | Val Acc: 19.68% | Val Macro F1: 0.1479 | Val Balanced Acc: 33.80%
+Epoch [20/100] | Train Loss: 1.5945 | Train Acc: 51.64% | Val Loss: 2.3497 | Val Acc: 23.03% | Val Macro F1: 0.1510 | Val Balanced Acc: 33.74%
+Epoch [21/100] | Train Loss: 1.5928 | Train Acc: 51.66% | Val Loss: 2.3907 | Val Acc: 21.66% | Val Macro F1: 0.1557 | Val Balanced Acc: 33.54%
+Epoch [22/100] | Train Loss: 1.5512 | Train Acc: 52.66% | Val Loss: 2.3647 | Val Acc: 22.89% | Val Macro F1: 0.1551 | Val Balanced Acc: 34.21%
+Epoch [23/100] | Train Loss: 1.5480 | Train Acc: 52.81% | Val Loss: 2.3865 | Val Acc: 22.10% | Val Macro F1: 0.1506 | Val Balanced Acc: 33.83%
+Epoch [24/100] | Train Loss: 1.5262 | Train Acc: 53.02% | Val Loss: 2.3847 | Val Acc: 22.46% | Val Macro F1: 0.1568 | Val Balanced Acc: 34.59%
+Epoch [25/100] | Train Loss: 1.5108 | Train Acc: 53.54% | Val Loss: 2.3364 | Val Acc: 23.55% | Val Macro F1: 0.1571 | Val Balanced Acc: 34.23%
+Epoch [26/100] | Train Loss: 1.4873 | Train Acc: 54.55% | Val Loss: 2.3404 | Val Acc: 23.47% | Val Macro F1: 0.1636 | Val Balanced Acc: 33.41%
+Epoch [27/100] | Train Loss: 1.4845 | Train Acc: 54.24% | Val Loss: 2.3466 | Val Acc: 23.29% | Val Macro F1: 0.1593 | Val Balanced Acc: 33.23%
+Epoch [28/100] | Train Loss: 1.4735 | Train Acc: 55.02% | Val Loss: 2.3831 | Val Acc: 22.31% | Val Macro F1: 0.1568 | Val Balanced Acc: 33.81%
+Epoch [29/100] | Train Loss: 1.4714 | Train Acc: 55.71% | Val Loss: 2.3743 | Val Acc: 22.25% | Val Macro F1: 0.1595 | Val Balanced Acc: 33.82%
+Epoch [30/100] | Train Loss: 1.4285 | Train Acc: 56.06% | Val Loss: 2.3368 | Val Acc: 22.50% | Val Macro F1: 0.1626 | Val Balanced Acc: 33.44%
+
+model_device=cuda:0, input_device=cuda:0, batch_shape=(32, 3, 224, 224)
+Epoch [1/100] | Train Loss: 1.3899 | Train Acc: 57.01% | Val Loss: 2.2746 | Val Acc: 25.24% | Val Macro F1: 0.1671 | Val Balanced Acc: 33.71%
+Epoch [2/100] | Train Loss: 1.3494 | Train Acc: 57.75% | Val Loss: 2.2653 | Val Acc: 25.48% | Val Macro F1: 0.1736 | Val Balanced Acc: 33.72%
+Epoch [3/100] | Train Loss: 1.3164 | Train Acc: 59.62% | Val Loss: 2.2710 | Val Acc: 25.68% | Val Macro F1: 0.1735 | Val Balanced Acc: 33.73%
+Epoch [4/100] | Train Loss: 1.3129 | Train Acc: 59.70% | Val Loss: 2.2730 | Val Acc: 25.86% | Val Macro F1: 0.1738 | Val Balanced Acc: 34.33%
+Epoch [5/100] | Train Loss: 1.2793 | Train Acc: 60.56% | Val Loss: 2.2567 | Val Acc: 25.92% | Val Macro F1: 0.1759 | Val Balanced Acc: 34.21%
+Epoch [6/100] | Train Loss: 1.2761 | Train Acc: 60.75% | Val Loss: 2.2584 | Val Acc: 26.28% | Val Macro F1: 0.1786 | Val Balanced Acc: 34.16%
+Epoch [7/100] | Train Loss: 1.2419 | Train Acc: 62.00% | Val Loss: 2.2525 | Val Acc: 26.35% | Val Macro F1: 0.1806 | Val Balanced Acc: 34.44%
+Epoch [8/100] | Train Loss: 1.2497 | Train Acc: 61.38% | Val Loss: 2.2411 | Val Acc: 26.85% | Val Macro F1: 0.1826 | Val Balanced Acc: 34.61%
+Epoch [9/100] | Train Loss: 1.2371 | Train Acc: 62.01% | Val Loss: 2.2325 | Val Acc: 26.68% | Val Macro F1: 0.1836 | Val Balanced Acc: 34.77%
+Epoch [10/100] | Train Loss: 1.2068 | Train Acc: 62.76% | Val Loss: 2.2336 | Val Acc: 26.86% | Val Macro F1: 0.1856 | Val Balanced Acc: 34.70%

@@ -114,20 +114,27 @@ JSON bbox → 상세 부위 Lazy Crop
 
 ## 6. 모델 연동 계약
 
-`model.py`는 사용자 구현 영역이다. 다음 함수 시그니처를 유지한다.
+모델 학습은 사용자의 `CNN_model_PyTorch.ipynb`에서 수행하고, `model.py`는 저장된 가중치를 웹앱에 연결한다. 모델 구조와 전처리는 학습 노트북과 동일하게 유지한다.
 
 ```python
 def load_feature_extractor():
-    """TensorFlow/Keras feature extractor를 반환한다."""
+    """Model/fashion_mood_model.pth를 읽어 eval 상태의 PyTorch 모델을 반환한다."""
 
 def extract_image_embedding(image, model):
     """PIL 이미지 또는 배열을 임베딩 벡터로 변환한다."""
 
 def predict_mood(image, model):
-    """선택 사항: 무드 분류 확률 또는 라벨을 반환한다."""
+    """mood, confidence, mood_scores를 반환한다."""
+
+def analyze_image(image, model):
+    """한 번의 추론으로 무드 결과와 추천용 embedding을 함께 반환한다."""
 ```
 
-`extract_image_embedding`은 분류기의 마지막 softmax 확률이 아니라, 일반적으로 마지막 분류층 직전의 feature vector를 반환한다. `predict_mood`는 무드 진단용이며 유사 이미지 검색에는 사용하지 않는다.
+`extract_image_embedding`은 마지막 분류층 직전의 256차원 벡터를 L2 정규화해 반환한다. 무드 확률과 검색 벡터는 구분한다. 기본 클래스 순서는 학습 노트북의 24개 `ImageFolder.classes` 순서와 같다. 전처리는 RGB → 224×224 Resize → ToTensor → ImageNet Normalize다.
+
+웹앱은 실제 예측 무드·점수를 표시하고, 성별·의류 종류는 모델이 예측한 것처럼 표시하지 않는다. 모델이 없거나 저장 중이면 안내를 표시한다. 모델 파일 생성·변경 시 캐시 키가 바뀌며 같은 이미지와 모델에 대한 분석은 세션 안에서 재사용한다.
+
+유사 추천 전에 앱에서 사용하는 웹 카탈로그 CSV로 `python model.py --build-index recommend_pool/metadata.csv`를 실행한다. `metadata_web.csv` 또는 `metadata_r2.csv`를 사용하는 앱이라면 해당 파일을 인자로 전달한다. 생성된 `item_embeddings_web.npy`와 `.json`에는 모델 체크섬·전처리 버전·카탈로그 행 순서·벡터 체크섬을 함께 기록한다. 검증되지 않은 벡터를 사용하거나 무작위 결과를 유사도 순위로 표시하지 않는다. 실행 예시는 `MODEL_INTEGRATION.md`에 정리한다.
 
 향후 모델 분석 결과는 다음처럼 확장할 수 있다.
 

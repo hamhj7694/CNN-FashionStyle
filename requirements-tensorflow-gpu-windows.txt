@@ -1,0 +1,14 @@
+# Native-Windows TensorFlow GPU environment for CNN_model.ipynb
+# Python 3.10 is required for TensorFlow 2.10.
+# CUDA Toolkit 11.2 and cuDNN 8.1 must also be installed on Windows.
+# Streamlit is intentionally excluded because its protobuf requirement
+# conflicts with TensorFlow 2.10. Use the project runtime environment for app.py.
+
+tensorflow==2.10.0
+numpy==1.23.5
+pandas>=2.0.0,<3.0.0
+scikit-learn>=1.2.0,<2.0.0
+Pillow>=9.0.0
+matplotlib>=3.7.0,<4.0.0
+ipykernel>=6.25.0
+jupyter>=1.0.0

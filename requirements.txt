@@ -1,8 +1,28 @@
+# MoodFit AI - common runtime and notebook dependencies
+#
+# Install with:
+#   python -m pip install -r requirements.txt
+#
+# Model frameworks are pinned in requirements-pytorch-gpu.txt and
+# requirements-tensorflow-gpu-windows.txt because their GPU runtimes differ.
+
+# Streamlit web application
 streamlit>=1.30.0
 streamlit-shadcn-ui>=0.1.18
-tensorflow>=2.13.0
+
+# Data processing and recommendation logic
 pandas>=2.0.0
-numpy>=1.24.0
+numpy>=1.23.0,<2.0.0
 scikit-learn>=1.2.0
 Pillow>=9.0.0
+
+# Training and evaluation charts
+matplotlib>=3.7.0
+tqdm>=4.66.0
+
+# VS Code/Jupyter notebook kernel
+ipykernel>=6.25.0
+jupyter>=1.0.0
+
+# Cloudflare R2 / S3-compatible image storage
 boto3>=1.34.0

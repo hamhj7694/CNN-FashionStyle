@@ -23,6 +23,8 @@ uploads/
 *.hdf5
 *.pb
 *.tflite
+*.pth
+*.pt
 
 # Local office documents
 *.hwp
