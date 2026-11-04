@@ -1,0 +1,174 @@
+"""MoodFit 추천 로직과 Lazy Cropping 캐시."""
+
+from __future__ import annotations
+
+import ast
+import json
+import os
+import random
+import re
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from PIL import Image
+from sklearn.metrics.pairwise import cosine_similarity
+
+GENDER_FILTERS = {
+    "전체": None,
+    "여성 (공용 포함)": {"여성", "공용"},
+    "남성 (공용 포함)": {"남성", "공용"},
+}
+
+
+def filter_by_gender(df_meta: pd.DataFrame, selected_gender: str = "전체") -> pd.DataFrame:
+    """성별을 1차 필터링한다. 여성/남성 선택은 항상 공용을 포함한다."""
+
+    if df_meta.empty or selected_gender not in GENDER_FILTERS or GENDER_FILTERS[selected_gender] is None:
+        return df_meta.copy()
+    if "gender" not in df_meta.columns:
+        return df_meta.copy()
+    return df_meta[df_meta["gender"].isin(GENDER_FILTERS[selected_gender])].copy()
+
+
+def filter_catalog(
+    df_meta: pd.DataFrame,
+    selected_gender: str = "전체",
+    selected_category: str = "전체",
+    selected_mood: str = "전체",
+) -> pd.DataFrame:
+    """성별 → 카테고리 → 무드 순서로 추천 후보를 필터링한다."""
+
+    filtered = filter_by_gender(df_meta, selected_gender)
+    if selected_category != "전체" and "category" in filtered.columns:
+        filtered = filtered[filtered["category"] == selected_category].copy()
+    if selected_mood != "전체" and "mood" in filtered.columns:
+        filtered = filtered[filtered["mood"] == selected_mood].copy()
+    return filtered
+
+
+def _parse_bbox(value: Any) -> tuple[int, int, int, int] | None:
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return None
+    try:
+        parsed = value if isinstance(value, (list, tuple)) else json.loads(str(value))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        try:
+            parsed = ast.literal_eval(str(value))
+        except (ValueError, SyntaxError):
+            return None
+    if not isinstance(parsed, (list, tuple)) or len(parsed) != 4:
+        return None
+    try:
+        x1, y1, x2, y2 = (max(0, int(float(number))) for number in parsed)
+    except (TypeError, ValueError):
+        return None
+    return x1, y1, x2, y2
+
+
+def _safe_cache_name(item_id: Any) -> str:
+    return re.sub(r"[^0-9A-Za-z가-힣_-]+", "_", str(item_id)).strip("_") or "item"
+
+
+def lazy_crop_item(
+    item: dict[str, Any] | pd.Series,
+    cache_dir: str | Path = "recommend_pool/processed_crops",
+    size: tuple[int, int] = (512, 512),
+) -> str | None:
+    """추천 카드에 필요한 아이템만 최초 1회 크롭하고 캐시 경로를 반환한다."""
+
+    record = dict(item)
+    item_id = _safe_cache_name(record.get("id", "item"))
+    cache_root = Path(cache_dir)
+    cache_root.mkdir(parents=True, exist_ok=True)
+    cached_path = cache_root / f"crop_{item_id}.jpg"
+    if os.path.exists(cached_path):
+        return str(cached_path)
+
+    source_path = Path(str(record.get("original_img_path", record.get("image_path", ""))))
+    if not source_path.is_file():
+        return None
+
+    try:
+        with Image.open(source_path) as source:
+            image = source.convert("RGB")
+            bbox = _parse_bbox(record.get("bbox"))
+            if bbox:
+                x1, y1, x2, y2 = bbox
+                x1, x2 = min(x1, image.width), min(x2, image.width)
+                y1, y2 = min(y1, image.height), min(y2, image.height)
+                if x2 > x1 and y2 > y1:
+                    image = image.crop((x1, y1, x2, y2))
+            image = image.resize(size, Image.Resampling.LANCZOS)
+            image.save(cached_path, format="JPEG", quality=91, optimize=True)
+    except (OSError, ValueError):
+        return None
+    return str(cached_path) if cached_path.is_file() else None
+
+
+def _sample_records(dataframe: pd.DataFrame, count: int, random_state: int | None) -> list[dict[str, Any]]:
+    if dataframe.empty or count <= 0:
+        return []
+    return dataframe.sample(n=min(count, len(dataframe)), random_state=random_state).to_dict("records")
+
+
+def get_recommendation_sections(
+    user_embedding: Any,
+    selected_category: str,
+    df_meta: pd.DataFrame,
+    item_embeddings: Any = None,
+    selected_gender: str = "전체",
+    selected_mood: str = "전체",
+    similar_count: int = 5,
+    discovery_count: int = 5,
+    random_state: int | None = 42,
+) -> dict[str, list[dict[str, Any]]]:
+    """유사 추천과 디스커버리 추천을 분리해 반환한다."""
+
+    filtered = filter_catalog(df_meta, selected_gender, selected_category, selected_mood)
+    if filtered.empty:
+        return {"similar": [], "discovery": []}
+
+    similar: list[dict[str, Any]] = []
+    if user_embedding is not None and item_embeddings is not None:
+        try:
+            matrix = np.asarray(item_embeddings)
+            valid_positions = [position for position, index in enumerate(df_meta.index) if index in filtered.index]
+            if matrix.ndim == 2 and len(matrix) == len(df_meta) and valid_positions:
+                scores = cosine_similarity(np.asarray(user_embedding).reshape(1, -1), matrix[valid_positions])[0]
+                ranked_positions = np.argsort(-scores)[:similar_count]
+                similar = filtered.iloc[ranked_positions].copy().assign(
+                    similarity=[float(scores[position]) for position in ranked_positions]
+                ).to_dict("records")
+        except (TypeError, ValueError):
+            similar = []
+
+    if not similar:
+        similar = _sample_records(filtered, similar_count, random_state)
+
+    similar_ids = {str(item.get("id")) for item in similar}
+    remaining = filtered[~filtered["id"].astype(str).isin(similar_ids)] if "id" in filtered else filtered
+    discovery = _sample_records(remaining if not remaining.empty else filtered, discovery_count, random_state)
+    return {"similar": similar[:similar_count], "discovery": discovery[:discovery_count]}
+
+
+def get_recommendations(
+    user_embedding: Any,
+    selected_category: str,
+    df_meta: pd.DataFrame,
+    item_embeddings: Any = None,
+    selected_gender: str = "전체",
+    selected_mood: str = "전체",
+) -> list[dict[str, Any]]:
+    """기존 호출부 호환용: 유사 추천 5개와 디스커버리 5개를 합쳐 반환한다."""
+
+    sections = get_recommendation_sections(
+        user_embedding,
+        selected_category,
+        df_meta,
+        item_embeddings,
+        selected_gender,
+        selected_mood,
+    )
+    return sections["similar"] + sections["discovery"]
