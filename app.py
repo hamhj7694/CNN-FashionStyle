@@ -88,8 +88,8 @@ st.markdown(
     .mf-card-meta { color:var(--muted); font-size:.72rem; display:flex; justify-content:space-between; gap:.3rem; }
     .mf-card-title { font-weight:700; margin:.35rem 0 .2rem; font-size:.92rem; }
     .mf-image-link { display:block; color:inherit; text-decoration:none; cursor:zoom-in; }
-    .mf-image-frame { position:relative; overflow:hidden; border-radius:16px; background:#E2E8F0; aspect-ratio:4/5; }
-    .mf-image-frame img { display:block; width:100%; height:100%; object-fit:cover; transition:transform .28s ease; }
+    .mf-image-frame { position:relative; width:100%; overflow:hidden; border-radius:16px; background:#E2E8F0; aspect-ratio:4/5; }
+    .stApp .mf-image-frame > img { position:absolute; inset:0; display:block; width:100% !important; height:100% !important; max-width:none; max-height:none; object-fit:cover; object-position:center; transition:transform .28s ease; }
     .mf-image-frame:hover img { transform:scale(1.045); }
     .mf-detail-image { border-radius:18px; overflow:hidden; background:#F1F5F9; }
     .mf-detail-image img { display:block; width:100%; max-height:420px; object-fit:contain; }
@@ -104,6 +104,43 @@ st.markdown(
     div[data-testid='stRadio'] label { background:white; border:1px solid var(--line); border-radius:999px; padding:.32rem .8rem; }
     .stButton > button { border-radius:999px; border:1px solid var(--line); background:white; color:var(--ink); }
     .stButton > button:hover { border-color:#8B5CF6; color:#6D28D9; }
+
+    /* Bound the upload/diagnosis workspace and both image previews. */
+    .st-key-look_workspace { --mf-control-height:88px; height:auto; max-height:1200px; overflow:visible; padding-right:0; }
+    .mf-nav { gap:.75rem; flex-wrap:wrap; }
+    .st-key-look_workspace .mf-title { font-size:clamp(2rem,3.5vw,3.4rem); }
+    .st-key-look_workspace .mf-analysis { min-height:0; padding:.6rem; }
+    .st-key-look_workspace .mf-analysis h3 { margin:.45rem 0; }
+    .st-key-look_workspace .mf-analysis p { margin-bottom:.7rem; }
+    .mf-upload-frame { height:700px; max-height:700px; position:relative; overflow:hidden; border-radius:16px; background:#E2E8F0; }
+    .mf-selected-frame { height:700px; max-height:700px; position:relative; overflow:hidden; border-radius:16px; background:#E2E8F0; }
+    .stApp .mf-upload-frame > img, .stApp .mf-selected-frame > img { position:absolute; inset:0; width:100% !important; height:100% !important; max-height:none; object-fit:contain; object-position:center; }
+    .mf-selected-caption { margin:.4rem 0 0; color:var(--muted); font-size:.8rem; }
+    .st-key-upload_control [data-testid="stFileUploaderDropzone"] { box-sizing:border-box; height:var(--mf-control-height); min-height:var(--mf-control-height); padding:.75rem 1rem; border-radius:16px; }
+    .mf-selected-empty { box-sizing:border-box; height:var(--mf-control-height); min-height:var(--mf-control-height); padding:.75rem 1rem; border:1px solid var(--line); border-radius:16px; background:#FFFFFF; display:flex; flex-direction:column; justify-content:center; }
+    .mf-selected-empty .mf-panel-title { margin-bottom:.35rem; }
+    .mf-selected-empty p { margin:0; color:var(--muted); font-size:.85rem; line-height:1.6; }
+
+    /* The native button covers the image without navigating away from the session. */
+    [class*="st-key-recommend_pick_"] { position:relative; }
+    [class*="st-key-recommend_pick_"] [data-testid="stElementContainer"]:has(> [data-testid="stButton"]) { position:absolute; inset:0; width:100%; height:100%; z-index:1; }
+    [class*="st-key-recommend_pick_"] [data-testid="stButton"] { width:100%; height:100%; }
+    [class*="st-key-recommend_pick_"] [data-testid="stButton"] > button { width:100%; height:100%; padding:0; border:0; border-radius:16px; background:transparent !important; color:transparent !important; cursor:pointer; }
+    [class*="st-key-recommend_pick_"] [data-testid="stButton"] > button:focus-visible { outline:3px solid #7C3AED; outline-offset:-3px; }
+    [class*="st-key-recommend_pick_"]:hover img { transform:scale(1.045); }
+    .mf-card-selected { outline:3px solid #7C3AED; outline-offset:-3px; }
+    .st-key-selected_image_viewer [data-testid="stElementContainer"], .st-key-upload_image_viewer [data-testid="stElementContainer"] { height:700px !important; }
+    .st-key-selected_image_viewer iframe, .st-key-upload_image_viewer iframe { height:100% !important; width:100%; }
+    @media (max-width:900px) {
+        .mf-upload-frame { height:600px; }
+        .st-key-selected_image_viewer [data-testid="stElementContainer"], .st-key-upload_image_viewer [data-testid="stElementContainer"] { height:600px !important; }
+    }
+    @media (max-width:640px) {
+        .st-key-look_workspace { --mf-control-height:104px; }
+        .mf-upload-frame { height:320px; }
+        .mf-selected-frame { height:320px; }
+        .st-key-selected_image_viewer [data-testid="stElementContainer"], .st-key-upload_image_viewer [data-testid="stElementContainer"] { height:320px !important; }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -195,7 +232,10 @@ def _normalize_metadata(dataframe: pd.DataFrame) -> pd.DataFrame:
     for column in required:
         if column not in dataframe.columns:
             dataframe[column] = ""
-    return dataframe[required].fillna("")
+    dataframe = dataframe[required].fillna("")
+    for column in ("mood", "category"):
+        dataframe[column] = dataframe[column].astype(str).str.strip()
+    return dataframe
 
 
 @st.cache_data(show_spinner=False)
@@ -232,6 +272,7 @@ def _attach_demo_moods(dataframe: pd.DataFrame, model: Any) -> pd.DataFrame:
 
 def _pick_mood_recommendations(
     dataframe: pd.DataFrame, mood_scores: dict[str, float], count: int = 5,
+    random_state: int | None = 42,
 ) -> dict[str, list[dict[str, Any]]]:
     """Top-1 무드 5개와 Top-2/3 무드 5개를 랜덤하게 선택한다."""
     ranked_moods = [
@@ -240,6 +281,10 @@ def _pick_mood_recommendations(
     if dataframe.empty or not ranked_moods:
         return {"similar": [], "discovery": []}
 
+    if "id" in dataframe.columns:
+        dataframe = dataframe.drop_duplicates(subset=["id"], keep="first")
+    rng = np.random.default_rng(random_state)
+
     def sample_pool(pool: pd.DataFrame, amount: int, used_ids: set[str]) -> list[dict[str, Any]]:
         if pool.empty or amount <= 0:
             return []
@@ -247,25 +292,18 @@ def _pick_mood_recommendations(
             pool = pool[~pool["id"].astype(str).isin(used_ids)]
         if pool.empty:
             return []
-        sampled = pool.sample(n=min(amount, len(pool)), random_state=None)
+        sampled = pool.sample(n=min(amount, len(pool)), random_state=rng)
         return sampled.to_dict("records")
 
     used_ids: set[str] = set()
     top1_pool = dataframe[dataframe["mood"] == ranked_moods[0]]
     top1 = sample_pool(top1_pool, count, used_ids)
     used_ids.update(str(item.get("id")) for item in top1)
-    if len(top1) < count:
-        fallback = sample_pool(dataframe, count - len(top1), used_ids)
-        top1.extend(fallback)
-        used_ids.update(str(item.get("id")) for item in fallback)
 
     top23_moods = set(ranked_moods[1:3])
     top23_pool = dataframe[dataframe["mood"].isin(top23_moods)]
     top23 = sample_pool(top23_pool, count, used_ids)
     used_ids.update(str(item.get("id")) for item in top23)
-    if len(top23) < count:
-        fallback = sample_pool(dataframe, count - len(top23), used_ids)
-        top23.extend(fallback)
 
     return {"similar": top1[:count], "discovery": top23[:count]}
 
@@ -336,15 +374,256 @@ def _crop_source(item: dict[str, Any]) -> str:
 
 
 def _select_item(item: dict[str, Any]) -> None:
+    # Button callbacks run before the next script execution; keep the upload intact.
     st.session_state["selected_item"] = item
     st.session_state["detail_mode"] = "full"
-    _rerun()
+    _clear_query_params()
 
+
+def ensure_selected_recommendation(
+    recommendations: list[dict[str, Any]], dataframe: pd.DataFrame,
+) -> dict[str, Any] | None:
+    selected = st.session_state.get("selected_item")
+    if selected and "id" in dataframe.columns:
+        if not dataframe["id"].astype(str).eq(str(selected.get("id", ""))).any():
+            selected = None
+    if selected is None and recommendations:
+        selected = recommendations[0]
+    st.session_state["selected_item"] = selected
+    return selected
+
+
+def render_bounded_image(source: str, alt: str, frame_class: str) -> None:
+    image_src = _as_image_src(source)
+    if not image_src:
+        st.markdown('<div class="mf-empty">이미지 준비 중</div>', unsafe_allow_html=True)
+        return
+    st.markdown(
+        f'<div class="{frame_class}"><img src="{html.escape(image_src, quote=True)}" '
+        f'alt="{html.escape(alt, quote=True)}"></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def image_viewer_html(image_src: str, alt: str, frame_class: str = "mf-selected-frame") -> str:
+    """Build the isolated viewer using escaped image attributes and local JS only."""
+    template = r"""<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html, body { margin:0; width:100%; height:100%; overflow:hidden; font-family:system-ui,sans-serif; }
+.mf-selected-frame { position:relative; width:100%; height:100%; max-height:100%; overflow:hidden; border-radius:16px; background:#E2E8F0; cursor:grab; touch-action:none; user-select:none; outline-offset:-3px; }
+.mf-selected-frame:focus-visible { outline:3px solid #7C3AED; }
+.mf-selected-frame.dragging { cursor:grabbing; }
+.mf-selected-frame img { position:absolute; top:0; left:0; display:block; max-width:none; max-height:none; transform-origin:0 0; pointer-events:none; user-select:none; visibility:hidden; will-change:transform; }
+.viewer-controls { position:absolute; top:10px; right:10px; display:flex; align-items:center; gap:6px; z-index:1; }
+.viewer-controls button, .viewer-controls output { border:0; border-radius:8px; padding:6px 9px; background:rgba(255,255,255,.93); color:#0F172A; font-size:12px; }
+.viewer-controls button { cursor:pointer; }
+.viewer-controls button:focus-visible { outline:2px solid #7C3AED; }
+.viewer-hint { position:absolute; bottom:10px; left:10px; padding:5px 8px; border-radius:8px; background:rgba(15,23,42,.7); color:white; font-size:11px; pointer-events:none; }
+.viewer-status { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#64748B; padding:20px; text-align:center; pointer-events:none; }
+.viewer-status[hidden] { display:none; }
+</style>
+</head>
+<body>
+<div id="viewer" class="mf-selected-frame" tabindex="0" aria-label="선택된 추천 이미지. 휠로 확대 축소, 드래그로 이동, 더블클릭으로 초기화">
+  <img id="image" src="__IMAGE_SRC__" alt="__IMAGE_ALT__" draggable="false">
+  <div class="viewer-controls">
+    <output id="zoom" aria-label="확대 비율">100%</output>
+    <button id="reset" type="button" aria-label="이미지 확대와 위치 초기화">초기화</button>
+  </div>
+  <div class="viewer-hint">휠: 확대·축소 · 드래그: 이동 · 더블클릭: 초기화</div>
+  <div id="status" class="viewer-status" role="status">이미지를 불러오는 중입니다.</div>
+</div>
+<script>
+(() => {
+  'use strict';
+  const frame = document.getElementById('viewer');
+  const image = document.getElementById('image');
+  const zoomLabel = document.getElementById('zoom');
+  const resetButton = document.getElementById('reset');
+  const status = document.getElementById('status');
+  let ready = false, zoom = 1, base = 1, x = 0, y = 0;
+  let width = 0, height = 0, pointer = null, lastX = 0, lastY = 0;
+  const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+
+  function paint() {
+    if (!ready) return;
+    const scale = base * zoom;
+    // Never drag beyond the image edge into an empty background.
+    x = clamp(x, Math.min(0, width - image.naturalWidth * scale), 0);
+    y = clamp(y, Math.min(0, height - image.naturalHeight * scale), 0);
+    image.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+    zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+  }
+
+  function reset() {
+    if (!image.naturalWidth || !image.naturalHeight) return;
+    const bounds = frame.getBoundingClientRect();
+    width = bounds.width;
+    height = bounds.height;
+    if (!width || !height) return;
+    // Cover fit: keep aspect ratio and fill the frame at the minimum zoom.
+    base = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+    zoom = 1;
+    x = (width - image.naturalWidth * base) / 2;
+    y = (height - image.naturalHeight * base) / 2;
+    image.style.width = `${image.naturalWidth}px`;
+    image.style.height = `${image.naturalHeight}px`;
+    ready = true;
+    image.style.visibility = 'visible';
+    status.hidden = true;
+    paint();
+  }
+
+  function zoomAt(nextZoom, px, py) {
+    if (!ready) return;
+    nextZoom = clamp(nextZoom, 1, 6);
+    const ratio = nextZoom / zoom;
+    // Keep the image point underneath the cursor stationary while zooming.
+    x = px - (px - x) * ratio;
+    y = py - (py - y) * ratio;
+    zoom = nextZoom;
+    paint();
+  }
+
+  frame.addEventListener('wheel', event => {
+    if (!ready) return;
+    event.preventDefault();
+    const bounds = frame.getBoundingClientRect();
+    const units = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? height : 1;
+    const delta = clamp(event.deltaY * units, -500, 500);
+    zoomAt(zoom * Math.exp(-delta * 0.002), event.clientX - bounds.left, event.clientY - bounds.top);
+  }, { passive: false });
+
+  frame.addEventListener('pointerdown', event => {
+    if (!ready || event.button !== 0 || pointer !== null || event.target.closest('button')) return;
+    event.preventDefault();
+    frame.focus({ preventScroll: true });
+    pointer = event.pointerId;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    frame.setPointerCapture(pointer);
+    frame.classList.add('dragging');
+  });
+  frame.addEventListener('pointermove', event => {
+    if (event.pointerId !== pointer) return;
+    x += event.clientX - lastX;
+    y += event.clientY - lastY;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    paint();
+  });
+  function endDrag(event) {
+    if (event.pointerId !== pointer) return;
+    const previous = pointer;
+    pointer = null;
+    frame.classList.remove('dragging');
+    if (frame.hasPointerCapture(previous)) frame.releasePointerCapture(previous);
+  }
+  frame.addEventListener('pointerup', endDrag);
+  frame.addEventListener('pointercancel', endDrag);
+  frame.addEventListener('lostpointercapture', endDrag);
+  frame.addEventListener('dblclick', reset);
+  resetButton.addEventListener('click', reset);
+  frame.addEventListener('keydown', event => {
+    if (!ready || event.target.closest('button')) return;
+    switch (event.key) {
+      case '+': case '=': zoomAt(zoom * 1.2, width / 2, height / 2); break;
+      case '-': zoomAt(zoom / 1.2, width / 2, height / 2); break;
+      case '0': reset(); break;
+      case 'ArrowLeft': x += 35; paint(); break;
+      case 'ArrowRight': x -= 35; paint(); break;
+      case 'ArrowUp': y += 35; paint(); break;
+      case 'ArrowDown': y -= 35; paint(); break;
+      default: return;
+    }
+    event.preventDefault();
+  });
+  image.addEventListener('load', reset);
+  image.addEventListener('error', () => {
+    ready = false;
+    image.style.visibility = 'hidden';
+    status.hidden = false;
+    status.textContent = '이미지를 불러오지 못했습니다. 이미지를 다시 선택해 주세요.';
+  });
+  new ResizeObserver(() => {
+    const bounds = frame.getBoundingClientRect();
+    if (bounds.width !== width || bounds.height !== height) reset();
+  }).observe(frame);
+  if (image.complete && image.naturalWidth) reset();
+})();
+</script>
+</body>
+</html>
+"""
+    if frame_class not in {"mf-selected-frame", "mf-upload-frame"}:
+        raise ValueError("지원하지 않는 이미지 프레임입니다.")
+    template = template.replace("mf-selected-frame", frame_class).replace(
+        "선택된 추천 이미지. 휠로 확대 축소, 드래그로 이동, 더블클릭으로 초기화",
+        html.escape(f"{alt}. 휠로 확대 축소, 드래그로 이동, 더블클릭으로 초기화", quote=True),
+    )
+    return template.replace("__IMAGE_SRC__", html.escape(image_src, quote=True)).replace(
+        "__IMAGE_ALT__", html.escape(alt, quote=True),
+    )
+
+
+def render_interactive_image(source: str, *, viewer_key: str, alt: str, frame_class: str) -> None:
+    image_src = _as_image_src(source)
+    if not image_src:
+        st.info("이미지를 불러올 수 없습니다. 이미지를 다시 선택해 주세요.")
+        return
+    document = image_viewer_html(image_src, alt, frame_class)
+    # Separate iframes keep upload/recommendation zoom and drag independent.
+    with st.container(key=viewer_key):
+        if hasattr(st, "iframe"):
+            st.iframe(document, height=700, tab_index=0, alt=f"휠로 확대 축소하고 드래그로 이동하는 {alt}")
+        else:
+            from streamlit.components.v1 import html as component_html
+            component_html(document, height=700, scrolling=False, tab_index=0)
+
+
+def render_selected_recommendation(item: dict[str, Any] | None, show_title: bool = True) -> None:
+    if item is None:
+        st.markdown(
+            '<div class="mf-selected-empty">'
+            '<div class="mf-panel-title">선택된 추천 이미지</div>'
+            '<p>아래 추천 이미지를 선택하면 이곳에 표시됩니다.</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        return
+    if show_title:
+        st.markdown('<div class="mf-panel-title">선택된 추천 이미지</div>', unsafe_allow_html=True)
+    render_interactive_image(
+        _full_source(item), viewer_key="selected_image_viewer",
+        alt="선택된 추천 착장", frame_class="mf-selected-frame",
+    )
+    caption = " · ".join(str(item.get(key, "")) for key in ("category", "mood", "gender") if item.get(key))
+    st.markdown(f'<p class="mf-selected-caption">{html.escape(caption)}</p>', unsafe_allow_html=True)
 
 def render_card(item: dict[str, Any], section_key: str, index: int) -> None:
     full_source = _full_source(item)
-    select_query = f"select_id={quote(str(item.get('id', '')), safe='')}"
-    render_image_hover(full_source, f"{item.get('category', 'item')} full look", query=select_query)
+    with st.container(key=f"recommend_pick_{section_key}_{index}"):
+        selected = st.session_state.get("selected_item") or {}
+        is_selected = str(selected.get("id", "")) == str(item.get("id", ""))
+        image_src = _as_image_src(full_source)
+        frame_class = "mf-image-frame mf-card-selected" if is_selected else "mf-image-frame"
+        if image_src:
+            st.markdown(
+                f'<div class="{frame_class}"><img src="{html.escape(image_src, quote=True)}" '
+                f'alt="{html.escape(str(item.get("category", "추천 착장")), quote=True)}"></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown('<div class="mf-image-frame mf-empty">이미지 준비 중</div>', unsafe_allow_html=True)
+        st.button(
+            f"{item.get('category', '추천 착장')} · {item.get('mood', '')} 이미지 선택",
+            key=f"select_recommendation_{section_key}_{index}",
+            on_click=_select_item, args=(item,), use_container_width=True,
+        )
 
     category = html.escape(str(item.get("category", "기타")))
     mood = html.escape(str(item.get("mood", "미분류")))
@@ -475,40 +754,9 @@ def apply_query_selection(dataframe: pd.DataFrame) -> None:
 
 
 def render_analysis_panel(
-    uploaded_file: Any, selected_item: dict[str, Any] | None,
+    uploaded_file: Any,
     analysis: dict[str, Any] | None = None, analysis_error: str = "",
 ) -> None:
-    if selected_item:
-        header, close = st.columns([.82, .18])
-        with header:
-            st.markdown('<div class="mf-panel-title">ITEM DETAIL / SELECTED EDIT</div>', unsafe_allow_html=True)
-        with close:
-            if st.button("×", key="close_detail", use_container_width=True):
-                st.session_state["selected_item"] = None
-                st.session_state["detail_mode"] = "full"
-                _clear_query_params()
-                _rerun()
-
-        item = selected_item
-        full_source = _full_source(item)
-        crop_source = _crop_source(item)
-        detail_mode = st.session_state.get("detail_mode", "full")
-        main_source = crop_source if detail_mode == "crop" and crop_source else full_source
-        render_image_hover(main_source, "selected item detail")
-        st.markdown(
-            f'<div class="mf-analysis"><span class="mf-pill">{html.escape(str(item.get("mood", "미분류")))}</span><h3>{html.escape(str(item.get("category", "추천 아이템")))}</h3><p>선택한 추천 아이템의 전신 이미지와 아이템 크롭을 확인할 수 있습니다.</p><div class="mf-stat"><span>성별 범위</span><b>{html.escape(str(item.get("gender", "공용")))}</b></div><div class="mf-stat"><span>아이템 ID</span><b>{html.escape(str(item.get("id", "-")))}</b></div></div>',
-            unsafe_allow_html=True,
-        )
-        if crop_source:
-            st.markdown('<div class="mf-panel-title">CROP PREVIEW / HOVER TO INSPECT</div>', unsafe_allow_html=True)
-            crop_query = f"select_id={quote(str(item.get('id', '')), safe='')}&view=crop"
-            render_image_hover(crop_source, "item crop", query=crop_query)
-            if detail_mode == "crop" and st.button("전신 이미지로 돌아가기", key=f"full_detail_{item.get('id')}", use_container_width=True):
-                st.session_state["detail_mode"] = "full"
-                _clear_query_params()
-                _rerun()
-        return
-
     st.markdown('<div class="mf-panel-title">02 / MOOD DIAGNOSIS</div>', unsafe_allow_html=True)
     if uploaded_file and analysis:
         render_badge("MOOD DETECTED", "mood_detected", dark=True)
@@ -517,7 +765,7 @@ def render_analysis_panel(
         secondary = html.escape(" · ".join(f"{name} {score:.1%}" for name, score in alternatives))
         st.markdown(
             f'<div class="mf-analysis"><h3>{mood}</h3>'
-            '<p>업로드한 착장에서 감지한 패션 무드입니다. 성별과 의류 분류는 아래 필터에서 선택해 보세요.</p>'
+            '<p>업로드한 착장에서 감지한 패션 무드입니다. <br>무드와 의류 분류는 아래 필터에서 선택해 보세요.</p>'
             f'<div class="mf-stat"><span>예측 점수</span><b>{analysis["confidence"]:.1%}</b></div>'
             f'<div class="mf-stat"><span>함께 감지된 무드</span><b>{secondary}</b></div></div>',
             unsafe_allow_html=True,
@@ -530,7 +778,20 @@ def render_analysis_panel(
             st.session_state.pop("upload_analysis", None)
             _rerun()
     else:
-        st.markdown('<div class="mf-analysis"><div style="font-size:2.5rem;">✦</div><h3>Start with a look</h3><p>이미지를 업로드하면 무드 진단과 개인화된 아이템 편집이 이곳에 나타납니다.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="mf-analysis"><div style="font-size:2.5rem;">✦</div><h3>Start with a look</h3><p>당신과 어울리는 패션 취향을 확인해 보세요.<br>추천룩, 시밀러룩, 커플룩으로 활용해 보세요.</p></div>', unsafe_allow_html=True)
+
+
+
+def catalog_filter_options(dataframe: pd.DataFrame, column: str) -> list[str]:
+    if column not in dataframe.columns:
+        return ["전체"]
+    values = dataframe[column].dropna().astype(str).str.strip()
+    return ["전체"] + sorted({value for value in values if value and value != "전체"})
+
+
+def reset_catalog_filters() -> None:
+    st.session_state["mood_filter"] = "전체"
+    st.session_state["category_filter"] = "전체"
 
 
 def main() -> None:
@@ -538,55 +799,84 @@ def main() -> None:
     uploaded_file = None
 
     st.markdown('<div class="mf-nav"><div class="mf-logo">Mood<span>Fit</span> AI</div><div class="mf-nav-note">Editorial intelligence / 2026</div></div>', unsafe_allow_html=True)
-    st.markdown('<div class="mf-kicker">Your daily edit, intelligently styled</div>', unsafe_allow_html=True)
-    st.markdown('<h1 class="mf-title">Wear the mood<br>you mean.</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="mf-lede">착장 사진을 업로드하면 오늘의 무드를 읽고, 당신에게 어울리는 K-Fashion 아이템을 큐레이션합니다.</p>', unsafe_allow_html=True)
 
-    left, right = st.columns([1.08, .92], gap="large")
-    with left:
-        st.markdown('<div class="mf-panel-title">01 / UPLOAD YOUR LOOK</div>', unsafe_allow_html=True)
-        uploaded_file = st.file_uploader("착장 이미지 업로드", type=["jpg", "jpeg", "png", "webp"], label_visibility="collapsed")
+    with st.container(key="look_workspace"):
+        # Shared header row: both image previews start below its tallest column.
+        left, right = st.columns([1, 1], gap="large")
+        preview_src = ""
+        with left:
+            st.markdown('<div class="mf-kicker">Your daily edit, intelligently styled</div>', unsafe_allow_html=True)
+            st.markdown('<h1 class="mf-title">Wear the mood<br>you mean.</h1>', unsafe_allow_html=True)
+            st.markdown('<p class="mf-lede">착장 사진을 업로드하면 오늘의 무드를 읽고, <br>당신에게 어울리는 K-Fashion을 큐레이션합니다.</p>', unsafe_allow_html=True)
+
+            st.markdown('<div class="mf-panel-title">01 / UPLOAD YOUR LOOK</div>', unsafe_allow_html=True)
+
+        # Align the upload control and the empty recommendation box in one row.
+        upload_controls, recommendation_controls = st.columns([1, 1], gap="large")
+        with upload_controls:
+            with st.container(key="upload_control"):
+                uploaded_file = st.file_uploader("착장 이미지 업로드", type=["jpg", "jpeg", "png", "webp"], label_visibility="collapsed")
+            if uploaded_file:
+                try:
+                    uploaded_file.seek(0)
+                    with Image.open(uploaded_file) as uploaded_image:
+                        # Re-encode a preview; a very tall source never controls layout height.
+                        preview = uploaded_image.convert("RGB")
+                        preview.thumbnail((2400, 2400))
+                        preview_bytes = io.BytesIO()
+                        preview.save(preview_bytes, format="JPEG", quality=90)
+                    preview_src = "data:image/jpeg;base64," + base64.b64encode(preview_bytes.getvalue()).decode("ascii")
+                except (OSError, ValueError):
+                    st.error("이미지를 읽을 수 없습니다. JPG 또는 PNG 파일을 사용해 주세요.")
+
+        upload_signature = hashlib.sha256(uploaded_file.getvalue()).hexdigest() if uploaded_file else ""
+        previous_upload = st.session_state.get("upload_signature")
+        if previous_upload != upload_signature:
+            st.session_state["upload_signature"] = upload_signature
+            st.session_state["selected_item"] = None
+            st.session_state["detail_mode"] = "full"
+            st.session_state.pop("upload_analysis", None)
+            if previous_upload is not None:
+                _clear_query_params()
+
+        model, model_error = None, ""
+        analysis, analysis_error = None, ""
         if uploaded_file:
-            try:
-                uploaded_file.seek(0)
-                with Image.open(uploaded_file) as uploaded_image:
-                    st.image(uploaded_image.convert("RGB"), use_container_width=True, caption="Uploaded look")
-            except (OSError, ValueError):
-                st.error("이미지를 읽을 수 없습니다. JPG 또는 PNG 파일을 사용해 주세요.")
-        else:
-            st.markdown('<div class="mf-preview-empty" style="margin-top:1rem;"><strong>착장 미리보기</strong><small>상단 Upload 영역에서 이미지를 선택하면<br>이곳에 미리보기가 표시됩니다.</small></div>', unsafe_allow_html=True)
+            with st.spinner("착장의 무드를 분석하고 있어요..."):
+                model, model_error = load_model_safely(get_model_signature())
+                analysis, analysis_error = analyze_upload(uploaded_file, model)
+        if analysis and is_demo_data and model is not None:
+            dataframe = _attach_demo_moods(dataframe, model)
 
-    upload_signature = hashlib.sha256(uploaded_file.getvalue()).hexdigest() if uploaded_file else ""
-    previous_upload = st.session_state.get("upload_signature")
-    upload_changed = previous_upload != upload_signature
-    if upload_changed:
-        st.session_state["upload_signature"] = upload_signature
-        st.session_state["selected_item"] = None
-        st.session_state["detail_mode"] = "full"
-        st.session_state.pop("upload_analysis", None)
-        if previous_upload is not None:
-            _clear_query_params()
+        # Stable across card clicks; a different upload receives a different random seed.
+        recommendation_seed = int(upload_signature[:8], 16) if upload_signature else 42
+        top1_items = _pick_mood_recommendations(
+            dataframe, analysis["mood_scores"], count=5, random_state=recommendation_seed,
+        )["similar"] if analysis and not dataframe.empty else []
+        apply_query_selection(dataframe)
+        selected_item = ensure_selected_recommendation(top1_items, dataframe)
+        with right:
+            render_analysis_panel(uploaded_file, analysis, analysis_error or model_error)
+        with recommendation_controls:
+            if selected_item:
+                st.markdown('<div class="mf-panel-title">선택된 추천 이미지</div>', unsafe_allow_html=True)
+            else:
+                render_selected_recommendation(None)
 
-    model, model_error = None, ""
-    analysis, analysis_error = None, ""
-    if uploaded_file:
-        with st.spinner("착장의 무드를 분석하고 있어요..."):
-            model, model_error = load_model_safely(get_model_signature())
-            analysis, analysis_error = analyze_upload(uploaded_file, model)
-    if analysis and is_demo_data and model is not None:
-        dataframe = _attach_demo_moods(dataframe, model)
-
-    apply_query_selection(dataframe)
-    selected_item = st.session_state.get("selected_item")
-    with right:
-        render_analysis_panel(uploaded_file, selected_item, analysis, analysis_error or model_error)
+        # Create an image row only when an actual preview/selection is available.
+        if preview_src or selected_item:
+            image_left, image_right = st.columns([1, 1], gap="large")
+            with image_left:
+                if preview_src:
+                    render_interactive_image(
+                        preview_src, viewer_key="upload_image_viewer",
+                        alt="업로드한 착장", frame_class="mf-upload-frame",
+                    )
+            with image_right:
+                if selected_item:
+                    render_selected_recommendation(selected_item, show_title=False)
 
     if analysis and not dataframe.empty:
-        top1_items = _pick_mood_recommendations(
-            dataframe,
-            analysis["mood_scores"],
-            count=5,
-        )["similar"]
         st.markdown(
             f'<div class="mf-section"><div><h2>Top Mood Edit</h2>'
             f'<p>{html.escape(analysis["mood"])} 1순위 무드 의류 랜덤 추천</p></div>'
@@ -598,66 +888,61 @@ def main() -> None:
             for index, item in enumerate(top1_items):
                 with columns[index % 5]:
                     render_card(item, "top1", index)
+        else:
+            st.info("진단된 무드에 해당하는 추천 아이템이 아직 없습니다. 아래 필터에서 다른 무드를 선택해 주세요.")
 
-    st.markdown('<div class="mf-section"><div><h2>Explore the edit</h2><p>무드에서 시작해 성별 범위와 의류 분류로 큐레이션을 좁혀보세요.</p></div></div>', unsafe_allow_html=True)
-    filter_a, filter_b, filter_c = st.columns([1, 1.25, 1])
-    with filter_a:
-        mood_options = ["전체"] + sorted([str(value) for value in dataframe["mood"].unique() if str(value)]) if not dataframe.empty else ["전체"]
-        # 새 업로드/첫 분석 시 예측 무드를 기본값으로 쓰되 이후 사용자의 변경은 유지한다.
-        diagnosis_key = (upload_signature, model.checkpoint_sha256) if analysis else None
-        if analysis and st.session_state.get("diagnosis_filter_key") != diagnosis_key:
-            st.session_state["mood_filter"] = analysis["mood"] if analysis["mood"] in mood_options else "전체"
-            st.session_state["diagnosis_filter_key"] = diagnosis_key
-            st.session_state["mood_filter"] = "전체"
-        if st.session_state.get("mood_filter", "전체") not in mood_options:
-            st.session_state["mood_filter"] = "전체"
-        selected_mood = st.selectbox("무드", mood_options, key="mood_filter", label_visibility="collapsed")
-    with filter_b:
-        selected_gender = st.radio("성별", ["전체", "여성 (공용 포함)", "남성 (공용 포함)"], horizontal=True, label_visibility="collapsed")
-    with filter_c:
-        category_options = ["전체"] + sorted([str(value) for value in dataframe["category"].unique() if str(value)]) if not dataframe.empty else ["전체"]
-        selected_category = st.selectbox("의류 분류", category_options, label_visibility="collapsed")
+    st.divider()
+
+    st.markdown('<div class="mf-section"><div><h2>Explore the edit</h2><p>무드와 의류 분류를 선택해 아래 추천 목록을 좁혀보세요.</p></div></div>', unsafe_allow_html=True)
+    mood_options = catalog_filter_options(dataframe, "mood")
+    category_options = catalog_filter_options(dataframe, "category")
+    diagnosis_key = (upload_signature, model.checkpoint_sha256) if analysis else None
+    previous_diagnosis = st.session_state.get("diagnosis_filter_key")
+    if analysis and previous_diagnosis != diagnosis_key:
+        st.session_state["mood_filter"] = analysis["mood"] if analysis["mood"] in mood_options else "전체"
+        st.session_state["diagnosis_filter_key"] = diagnosis_key
+    elif not analysis and previous_diagnosis is not None:
+        st.session_state["mood_filter"] = "전체"
+        st.session_state["diagnosis_filter_key"] = None
+    for key, options in (("mood_filter", mood_options), ("category_filter", category_options)):
+        if st.session_state.get(key, "전체") not in options:
+            st.session_state[key] = "전체"
+
+    filter_mood, filter_category, filter_actions = st.columns([1, 1, .5], gap="medium", vertical_alignment="bottom")
+    with filter_mood:
+        selected_mood = st.selectbox("무드", mood_options, key="mood_filter", disabled=dataframe.empty)
+    with filter_category:
+        selected_category = st.selectbox("의류 분류", category_options, key="category_filter", disabled=dataframe.empty)
+    with filter_actions:
+        st.button("필터 초기화", key="reset_catalog_filters", on_click=reset_catalog_filters, use_container_width=True, disabled=dataframe.empty)
 
     if is_demo_data:
         st.info("현재는 로컬 이미지 폴더를 사용하는 데모 카탈로그입니다. AI Hub JSON 라벨과 metadata가 준비되면 정식 분류로 전환됩니다.")
     if dataframe.empty:
-        st.markdown('<div class="mf-empty">추천 데이터가 아직 없습니다. recommend_pool/raw_data/images와 labels를 준비한 뒤 preprocess.py를 실행해 주세요.</div>', unsafe_allow_html=True)
+        st.info("추천 데이터가 아직 없습니다. 이미지와 메타데이터를 준비해 주세요.")
+        return
+
+    # No gender restriction: the current catalog has no usable gender labels.
+    matching_items = filter_catalog(
+        dataframe, selected_gender="전체",
+        selected_category=selected_category, selected_mood=selected_mood,
+    )
+    match_count = matching_items["id"].nunique() if "id" in matching_items else len(matching_items)
+    st.caption(f"조건에 맞는 아이템 {match_count:,}개 · 무드: {selected_mood} · 의류 분류: {selected_category}")
+    if matching_items.empty:
+        st.info("선택한 조건에 맞는 아이템이 없습니다. 다른 무드·의류 분류를 선택하거나 필터를 초기화해 주세요.")
         return
 
     user_embedding = analysis["embedding"] if analysis else None
-    item_embeddings, index_error = load_item_embeddings(dataframe, model)
-    if not analysis and index_error:
-        st.info(f"{index_error} 현재는 선택한 필터의 아이템을 둘러볼 수 있습니다.")
+    item_embeddings, _ = load_item_embeddings(dataframe, model)
     sections = get_recommendation_sections(
-        user_embedding,
-        selected_category,
-        dataframe,
-        item_embeddings=item_embeddings,
-        selected_gender=selected_gender,
-        selected_mood=selected_mood,
-        random_state=42,
+        user_embedding, selected_category, dataframe,
+        item_embeddings=item_embeddings, selected_gender="전체",
+        selected_mood=selected_mood, random_state=recommendation_seed,
     )
-
-    has_similarity = user_embedding is not None and item_embeddings is not None
-    section_title = "AI Similarity" if has_similarity else "Curated Picks"
-    section_description = "입력한 전신 이미지와 가장 가까운 전신 추천" if has_similarity else "선택한 필터에서 발견한 아이템 · 유사도 순위가 아닙니다"
-    if analysis:
-        # 기본으로 선택된 Top-1 무드는 전체 후보를 대상으로 Top-1/2/3를 나눠 추천한다.
-        effective_mood = "전체" if selected_mood == analysis["mood"] else selected_mood
-        recommendation_pool = filter_catalog(
-            dataframe,
-            selected_gender=selected_gender,
-            selected_category=selected_category,
-            selected_mood=effective_mood,
-        )
-        sections = _pick_mood_recommendations(
-            recommendation_pool,
-            analysis["mood_scores"],
-            count=5,
-        )
-        has_similarity = False
-        section_title = "AI Mood Picks"
-        section_description = f"{analysis['mood']} Top-1 무드 5개 + Top-2·3 무드 5개"
+    has_similarity = bool(sections["similar"]) and all("similarity" in item for item in sections["similar"])
+    section_title = "AI Similarity" if has_similarity else "Mood Picks" if analysis else "Curated Picks"
+    section_description = "선택한 조건 안에서 입력한 착장과 가까운 아이템" if has_similarity else "선택한 무드·의류 분류에 맞는 아이템 · 유사도 순위가 아닙니다"
     st.markdown(f'<div class="mf-section"><div><h2>{section_title}</h2><p>{section_description}</p></div><span class="mf-pill">TOP 5</span></div>', unsafe_allow_html=True)
     similar_items = sections["similar"]
     if similar_items:
@@ -666,9 +951,9 @@ def main() -> None:
             with columns[index % 5]:
                 render_card(item, "similar", index)
     else:
-        st.markdown('<div class="mf-empty">현재 필터와 맞는 유사 아이템이 없습니다.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="mf-empty">현재 조건에 맞는 추천 아이템이 없습니다.</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="mf-section"><div><h2>Trending Discovery</h2><p>같은 필터 안에서 새롭게 발견한 랜덤 아이템</p></div><span class="mf-pill">TOP 5</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="mf-section"><div><h2>Trending Discovery</h2><p>같은 무드·의류 분류 조건에서 새롭게 발견한 아이템</p></div><span class="mf-pill">TOP 5</span></div>', unsafe_allow_html=True)
     discovery_items = sections["discovery"]
     if discovery_items:
         columns = st.columns(5, gap="medium")

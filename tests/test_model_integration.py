@@ -175,9 +175,9 @@ upload = io.BytesIO()
 Image.new("RGB", (128, 150), "blue").save(upload, format="PNG")
 result, error = app.analyze_upload(upload, network)
 assert not error
-app.render_analysis_panel(True, None, result)
+app.render_analysis_panel(True, result)
 assert app.analyze_upload(upload, network)[0] is result
-app.render_analysis_panel(True, None, None, "학습 완료 후 모델 저장이 필요합니다.")
+app.render_analysis_panel(True, None, "학습 완료 후 모델 저장이 필요합니다.")
 '''
         tested = AppTest.from_string(script).run(timeout=30)
         self.assertEqual(len(tested.exception), 0)

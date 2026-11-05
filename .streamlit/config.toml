@@ -1,0 +1,3 @@
+[server]
+# Poll shared files so imported modules refresh after code edits.
+fileWatcherType = "poll"

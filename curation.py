@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Collection
 import hashlib
 import json
 import os
@@ -17,6 +18,9 @@ from PIL import Image
 from sklearn.metrics.pairwise import cosine_similarity
 
 GENDER_FILTERS = {
+    "남성": {"남성"},
+    "여성": {"여성"},
+    "공용": {"공용"},
     "전체": None,
     "여성 (공용 포함)": {"여성", "공용"},
     "남성 (공용 포함)": {"남성", "공용"},
@@ -29,19 +33,28 @@ def _resolve_source_path(value: Any) -> Path:
     return path if path.is_absolute() else ROOT / path
 
 
-def filter_by_gender(df_meta: pd.DataFrame, selected_gender: str = "전체") -> pd.DataFrame:
-    """성별을 1차 필터링한다. 여성/남성 선택은 항상 공용을 포함한다."""
+def filter_by_gender(
+    df_meta: pd.DataFrame, selected_gender: str | Collection[str] = "전체",
+) -> pd.DataFrame:
+    """선택된 성별들의 합집합으로 필터링한다. 빈 선택은 빈 결과를 반환한다."""
 
-    if df_meta.empty or selected_gender not in GENDER_FILTERS or GENDER_FILTERS[selected_gender] is None:
+    if df_meta.empty:
         return df_meta.copy()
-    if "gender" not in df_meta.columns:
-        return df_meta.copy()
-    return df_meta[df_meta["gender"].isin(GENDER_FILTERS[selected_gender])].copy()
+    # 기존 문자열 호출은 유지하고, UI에서는 독립된 성별 목록을 전달한다.
+    if isinstance(selected_gender, str):
+        allowed = GENDER_FILTERS.get(selected_gender)
+        if allowed is None:
+            return df_meta.copy()
+    else:
+        allowed = set(selected_gender) & {"남성", "여성", "공용"}
+    if not allowed or "gender" not in df_meta.columns:
+        return df_meta.iloc[0:0].copy()
+    return df_meta[df_meta["gender"].isin(allowed)].copy()
 
 
 def filter_catalog(
     df_meta: pd.DataFrame,
-    selected_gender: str = "전체",
+    selected_gender: str | Collection[str] = "전체",
     selected_category: str = "전체",
     selected_mood: str = "전체",
 ) -> pd.DataFrame:
@@ -158,7 +171,7 @@ def get_recommendation_sections(
     selected_category: str,
     df_meta: pd.DataFrame,
     item_embeddings: Any = None,
-    selected_gender: str = "전체",
+    selected_gender: str | Collection[str] = "전체",
     selected_mood: str = "전체",
     similar_count: int = 5,
     discovery_count: int = 5,
@@ -166,7 +179,10 @@ def get_recommendation_sections(
 ) -> dict[str, list[dict[str, Any]]]:
     """유사 추천과 디스커버리 추천을 분리해 반환한다."""
 
-    filtered = filter_catalog(df_meta, selected_gender, selected_category, selected_mood)
+    # Reset the index so every retained row maps to its original embedding position,
+    # including catalogs with duplicate IDs or non-unique/non-sequential indexes.
+    catalog = df_meta.reset_index(drop=True)
+    filtered = filter_catalog(catalog, selected_gender, selected_category, selected_mood)
     if filtered.empty:
         return {"similar": [], "discovery": []}
     if "id" in filtered.columns:
@@ -176,8 +192,8 @@ def get_recommendation_sections(
     if user_embedding is not None and item_embeddings is not None:
         try:
             matrix = np.asarray(item_embeddings)
-            valid_positions = [position for position, index in enumerate(df_meta.index) if index in filtered.index]
-            if matrix.ndim == 2 and len(matrix) == len(df_meta) and valid_positions:
+            valid_positions = filtered.index.to_numpy(dtype=np.intp)
+            if matrix.ndim == 2 and len(matrix) == len(df_meta) and len(valid_positions):
                 scores = cosine_similarity(np.asarray(user_embedding).reshape(1, -1), matrix[valid_positions])[0]
                 ranked_positions = np.argsort(-scores)[:similar_count]
                 similar = filtered.iloc[ranked_positions].copy().assign(
@@ -201,7 +217,7 @@ def get_recommendations(
     selected_category: str,
     df_meta: pd.DataFrame,
     item_embeddings: Any = None,
-    selected_gender: str = "전체",
+    selected_gender: str | Collection[str] = "전체",
     selected_mood: str = "전체",
 ) -> list[dict[str, Any]]:
     """기존 호출부 호환용: 유사 추천 5개와 디스커버리 5개를 합쳐 반환한다."""
