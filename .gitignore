@@ -28,3 +28,10 @@ uploads/
 
 # Local office documents
 *.hwp
+
+# Generated optimized web images and local upload manifests
+recommend_pool/web_assets/
+recommend_pool/metadata_optimized.csv
+*.uploads.json
+*.progress.json
+*.errors.json

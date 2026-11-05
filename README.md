@@ -13,7 +13,7 @@
 | 웹 인터페이스 | Streamlit, HTML/CSS, JavaScript, streamlit-shadcn-ui |
 | 저장·검증 | 로컬 캐시, Git LFS, Cloudflare R2 연동, unittest, Streamlit AppTest |
 
-[실행 가이드](#5-직접-실행하기) · [필수 데이터 준비](#6-github에-없는-자료와-데이터-준비) · [CNN 학습](#7-cnn-모델-학습과-연동) · [테스트](#10-검증과-개선-방향)
+[클라우드 배포](CLOUD_DEPLOYMENT.md) · [실행 가이드](#5-직접-실행하기) · [필수 데이터 준비](#6-github에-없는-자료와-데이터-준비) · [CNN 학습](#7-cnn-모델-학습과-연동) · [테스트](#10-검증과-개선-방향)
 
 ## 1. 실제 실행 화면
 
@@ -292,6 +292,17 @@ recommend_pool/metadata_web.csv
 
 로컬 실행에서는 선택된 CSV의 `original_img_path`로 이미지에 접근할 수 있어야 합니다. 상대 경로의 기준은 프로젝트 루트입니다. **다른 PC에서 CSV만 복사한 경우**, 원본 이미지도 같은 상대 경로로 준비하거나 공개 이미지 URL이 있는 카탈로그를 제공해야 합니다.
 
+### 6-6. 웹 배포용 WebP 이미지 준비
+
+원본 학습 이미지를 보존하고, 웹에서는 긴 변 최대 **1,280px / WebP quality 80** 사본을 사용할 수 있습니다. 중복된 원본 경로는 한 번만 변환하고, 중단 후 같은 명령으로 완료 파일을 재사용합니다.
+
+```powershell
+& .\.venv\Scripts\python.exe prepare_web_images.py --workers 8
+& .\.venv\Scripts\python.exe upload_web_images.py --dry-run
+```
+
+실제 R2 연결과 업로드, 별도 **CPU용 Streamlit Cloud entrypoint**는 [클라우드 배포 가이드](CLOUD_DEPLOYMENT.md)를 따릅니다. 이 이미지 준비 경로는 현재 화면에서 사용하는 전신 WebP를 생성하며 원본 JPG·JSON은 변경하지 않습니다.
+
 ## 7. CNN 모델 학습과 연동
 
 ### 기본 체크포인트
@@ -403,7 +414,7 @@ dry run에도 미리보기 CSV가 생성되므로, 앱의 우선순위 카탈로
 & .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-README 작성 시점에 **18개 테스트**를 통과했습니다. 실제 ConvNeXt 구조를 사용하는 임시 가중치 테스트와 Streamlit AppTest를 포함합니다.
+웹 배포 준비 기준 **22개 테스트**를 통과했습니다. 실제 ConvNeXt 구조를 사용하는 임시 가중치 테스트와 Streamlit AppTest를 포함합니다.
 
 - 모델 저장·복원과 이미지 입력 형식별 추론 일치
 - 후보 인덱스 checksum·모델·카탈로그 검증
@@ -428,6 +439,8 @@ README 작성 시점에 **18개 테스트**를 통과했습니다. 실제 ConvNe
 | [`preprocess.py`](preprocess.py) | AI Hub JSON 해석·bbox 변환·상대 경로 CSV 생성 |
 | [`CNN_model_PyTorch4.ipynb`](CNN_model_PyTorch4.ipynb) | V4 CUDA 학습·이어 학습·평가 로그 |
 | [`upload_crops_to_r2.py`](upload_crops_to_r2.py), [`r2_storage.py`](r2_storage.py) | 크롭·썸네일 업로드·R2 URL 카탈로그 |
+| [`prepare_web_images.py`](prepare_web_images.py), [`upload_web_images.py`](upload_web_images.py) | 재개 가능한 WebP 최적화·R2 업로드 |
+| [`deploy/streamlit_app.py`](deploy/streamlit_app.py) | CPU 클라우드 실행 entrypoint |
 | [`tests/`](tests/) | 필터와 모델·웹 연동 회귀 테스트 |
 | [`PRD.md`](PRD.md) | 기획·데이터 계약·기능 요구사항 |
 
