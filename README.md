@@ -414,7 +414,7 @@ dry run에도 미리보기 CSV가 생성되므로, 앱의 우선순위 카탈로
 & .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-웹 배포 준비 기준 **23개 테스트**를 통과했습니다. 실제 ConvNeXt 구조를 사용하는 임시 가중치 테스트와 Streamlit AppTest를 포함합니다.
+웹 배포 준비 기준 **24개 테스트**를 통과했습니다. 실제 ConvNeXt 구조를 사용하는 임시 가중치 테스트와 Streamlit AppTest를 포함합니다.
 
 - 모델 저장·복원과 이미지 입력 형식별 추론 일치
 - 후보 인덱스 checksum·모델·카탈로그 검증

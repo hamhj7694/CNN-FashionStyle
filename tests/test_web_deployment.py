@@ -103,5 +103,17 @@ class WebAssetTests(unittest.TestCase):
         self.assertEqual(output.read_text(encoding='utf-8'),'existing catalog')
 
 
+class DeploymentEntryTests(unittest.TestCase):
+    def test_brand_styles_survive_streamlit_rerun(self):
+        from streamlit.testing.v1 import AppTest
+        entry = Path(__file__).resolve().parents[1] / 'deploy/streamlit_app.py'
+        page = AppTest.from_file(str(entry), default_timeout=60).run()
+        self.assertFalse(page.exception)
+        self.assertTrue(any('.mf-nav { display:flex' in block.value for block in page.markdown))
+        page.run()
+        self.assertFalse(page.exception)
+        self.assertTrue(any('.mf-nav { display:flex' in block.value for block in page.markdown))
+
+
 if __name__ == '__main__':
     unittest.main()
