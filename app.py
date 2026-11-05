@@ -105,15 +105,15 @@ st.markdown(
     .stButton > button { border-radius:999px; border:1px solid var(--line); background:white; color:var(--ink); }
     .stButton > button:hover { border-color:#8B5CF6; color:#6D28D9; }
 
-    /* Bound the upload/diagnosis workspace and both image previews. */
-    .st-key-look_workspace { --mf-control-height:88px; height:auto; max-height:1200px; overflow:visible; padding-right:0; }
+    /* Keep image previews bounded while the workspace follows its content. */
+    .st-key-look_workspace { --mf-control-height:88px; height:auto; max-height:none; overflow:visible; padding-right:0; }
     .mf-nav { gap:.75rem; flex-wrap:wrap; }
     .st-key-look_workspace .mf-title { font-size:clamp(2rem,3.5vw,3.4rem); }
     .st-key-look_workspace .mf-analysis { min-height:0; padding:.6rem; }
     .st-key-look_workspace .mf-analysis h3 { margin:.45rem 0; }
     .st-key-look_workspace .mf-analysis p { margin-bottom:.7rem; }
-    .mf-upload-frame { height:700px; max-height:700px; position:relative; overflow:hidden; border-radius:16px; background:#E2E8F0; }
-    .mf-selected-frame { height:700px; max-height:700px; position:relative; overflow:hidden; border-radius:16px; background:#E2E8F0; }
+    .mf-upload-frame { height:850px; max-height:850px; position:relative; overflow:hidden; border-radius:16px; background:#E2E8F0; }
+    .mf-selected-frame { height:850px; max-height:850px; position:relative; overflow:hidden; border-radius:16px; background:#E2E8F0; }
     .stApp .mf-upload-frame > img, .stApp .mf-selected-frame > img { position:absolute; inset:0; width:100% !important; height:100% !important; max-height:none; object-fit:contain; object-position:center; }
     .mf-selected-caption { margin:.4rem 0 0; color:var(--muted); font-size:.8rem; }
     .st-key-upload_control [data-testid="stFileUploaderDropzone"] { box-sizing:border-box; height:var(--mf-control-height); min-height:var(--mf-control-height); padding:.75rem 1rem; border-radius:16px; }
@@ -129,17 +129,17 @@ st.markdown(
     [class*="st-key-recommend_pick_"] [data-testid="stButton"] > button:focus-visible { outline:3px solid #7C3AED; outline-offset:-3px; }
     [class*="st-key-recommend_pick_"]:hover img { transform:scale(1.045); }
     .mf-card-selected { outline:3px solid #7C3AED; outline-offset:-3px; }
-    .st-key-selected_image_viewer [data-testid="stElementContainer"], .st-key-upload_image_viewer [data-testid="stElementContainer"] { height:700px !important; }
+    .st-key-selected_image_viewer [data-testid="stElementContainer"], .st-key-upload_image_viewer [data-testid="stElementContainer"] { height:850px !important; }
     .st-key-selected_image_viewer iframe, .st-key-upload_image_viewer iframe { height:100% !important; width:100%; }
     @media (max-width:900px) {
-        .mf-upload-frame { height:600px; }
-        .st-key-selected_image_viewer [data-testid="stElementContainer"], .st-key-upload_image_viewer [data-testid="stElementContainer"] { height:600px !important; }
+        .mf-upload-frame, .mf-selected-frame { height:700px; }
+        .st-key-selected_image_viewer [data-testid="stElementContainer"], .st-key-upload_image_viewer [data-testid="stElementContainer"] { height:700px !important; }
     }
     @media (max-width:640px) {
         .st-key-look_workspace { --mf-control-height:104px; }
-        .mf-upload-frame { height:320px; }
-        .mf-selected-frame { height:320px; }
-        .st-key-selected_image_viewer [data-testid="stElementContainer"], .st-key-upload_image_viewer [data-testid="stElementContainer"] { height:320px !important; }
+        .mf-upload-frame { height:420px; }
+        .mf-selected-frame { height:420px; }
+        .st-key-selected_image_viewer [data-testid="stElementContainer"], .st-key-upload_image_viewer [data-testid="stElementContainer"] { height:420px !important; }
     }
     </style>
     """,
@@ -579,10 +579,10 @@ def render_interactive_image(source: str, *, viewer_key: str, alt: str, frame_cl
     # Separate iframes keep upload/recommendation zoom and drag independent.
     with st.container(key=viewer_key):
         if hasattr(st, "iframe"):
-            st.iframe(document, height=700, tab_index=0, alt=f"휠로 확대 축소하고 드래그로 이동하는 {alt}")
+            st.iframe(document, height=850, tab_index=0, alt=f"휠로 확대 축소하고 드래그로 이동하는 {alt}")
         else:
             from streamlit.components.v1 import html as component_html
-            component_html(document, height=700, scrolling=False, tab_index=0)
+            component_html(document, height=850, scrolling=False, tab_index=0)
 
 
 def render_selected_recommendation(item: dict[str, Any] | None, show_title: bool = True) -> None:
