@@ -294,7 +294,7 @@ recommend_pool/metadata_web.csv
 
 ### 6-6. 웹 배포용 WebP 이미지 준비
 
-원본 학습 이미지를 보존하고, 웹에서는 긴 변 최대 **1,280px / WebP quality 80** 사본을 사용할 수 있습니다. 중복된 원본 경로는 한 번만 변환하고, 중단 후 같은 명령으로 완료 파일을 재사용합니다.
+원본 학습 이미지를 보존하고, 웹에서는 긴 변 최대 **1,280px / WebP quality 80** 사본을 사용할 수 있습니다. 전체 **120,975장**을 처리한 결과 **7.59 GB → 4.90 GB (35.46% 감소)**로 최적화했으며, 읽지 못한 이미지는 없었습니다. 용량은 10진 GB 기준입니다. 중복된 원본 경로는 한 번만 변환하고, 중단 후 같은 명령으로 완료 파일을 재사용합니다.
 
 ```powershell
 & .\.venv\Scripts\python.exe prepare_web_images.py --workers 8
@@ -414,7 +414,7 @@ dry run에도 미리보기 CSV가 생성되므로, 앱의 우선순위 카탈로
 & .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-웹 배포 준비 기준 **22개 테스트**를 통과했습니다. 실제 ConvNeXt 구조를 사용하는 임시 가중치 테스트와 Streamlit AppTest를 포함합니다.
+웹 배포 준비 기준 **23개 테스트**를 통과했습니다. 실제 ConvNeXt 구조를 사용하는 임시 가중치 테스트와 Streamlit AppTest를 포함합니다.
 
 - 모델 저장·복원과 이미지 입력 형식별 추론 일치
 - 후보 인덱스 checksum·모델·카탈로그 검증

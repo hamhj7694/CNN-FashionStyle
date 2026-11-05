@@ -78,7 +78,10 @@ def upload_file_to_r2(
     if not source_path.is_file():
         raise FileNotFoundError(source_path)
 
-    content_type = mimetypes.guess_type(source_path.name)[0] or "application/octet-stream"
+    # Windows MIME registries can mislabel WebP; browsers need the image type.
+    content_type = "image/webp" if source_path.suffix.lower() == ".webp" else (
+        mimetypes.guess_type(source_path.name)[0] or "application/octet-stream"
+    )
     client.upload_file(
         str(source_path),
         settings["bucket_name"],

@@ -4,13 +4,14 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pandas as pd
 from PIL import Image
 
 from prepare_web_images import optimize_image, prepare_catalog
 from upload_web_images import upload_catalog
+from r2_storage import upload_file_to_r2
 
 
 class WebAssetTests(unittest.TestCase):
@@ -79,6 +80,17 @@ class WebAssetTests(unittest.TestCase):
         self.assertNotIn('full_image_path',result)
         self.assertNotIn('full_image_key',result)
         self.assertTrue(result.full_image_url.eq('https://assets.example.test/full/a.webp').all())
+
+    def test_webp_mime_overrides_windows_registry(self):
+        self.prepared_csv()
+        client = Mock()
+        settings = dict(bucket_name='test-bucket', public_base_url='https://assets.example.test')
+        with patch('r2_storage.mimetypes.guess_type', return_value=('application/octet-stream', None)):
+            url = upload_file_to_r2(self.root/'asset.webp', 'full/a.webp', client, settings)
+        self.assertEqual(url, 'https://assets.example.test/full/a.webp')
+        headers = client.upload_file.call_args.kwargs['ExtraArgs']
+        self.assertEqual(headers['ContentType'], 'image/webp')
+        self.assertEqual(headers['CacheControl'], 'public, max-age=31536000, immutable')
 
     def test_failed_upload_does_not_replace_catalog(self):
         prepared=self.prepared_csv()

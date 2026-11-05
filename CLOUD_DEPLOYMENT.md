@@ -23,7 +23,7 @@ python prepare_web_images.py --workers 8
 
 Cloudflare에서 R2 버킷을 생성하고 공개 이미지 URL을 준비합니다. 개발 확인은 `r2.dev`, 지속적인 공개 서비스는 커스텀 도메인 구성을 사용합니다.
 
-`.streamlit/secrets.toml.example`을 `.streamlit/secrets.toml`로 복사한 뒤 R2 계정 ID, 버킷 이름, 공개 URL, 해당 버킷의 객체 읽기/쓰기 자격 증명을 설정합니다. 실제 비밀키를 Git에 커밋하지 않습니다.
+`.streamlit/secrets.toml.example`을 `.streamlit/secrets.toml`로 복사한 뒤 R2 계정 ID, 버킷 이름, 공개 URL, 해당 버킷의 객체 읽기/쓰기 자격 증명을 설정합니다. 실제 비밀키를 Git에 커밋하지 않습니다. 일회성 초기 업로드에는 해당 버킷의 객체 읽기/쓰기 권한과 24시간 같은 짧은 TTL을 설정할 수 있습니다. 업로드 키가 만료되어도 이미 저장된 객체와 공개 이미지 URL은 유지됩니다. 이후 추가 업로드 때만 새 업로드 자격 증명이 필요합니다.
 
 먼저 파일·용량만 확인합니다. dry run은 자격 증명 없이 실행할 수 있고 공개 CSV를 변경하지 않습니다.
 
