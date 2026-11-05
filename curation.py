@@ -21,6 +21,12 @@ GENDER_FILTERS = {
     "여성 (공용 포함)": {"여성", "공용"},
     "남성 (공용 포함)": {"남성", "공용"},
 }
+ROOT = Path(__file__).resolve().parent
+
+
+def _resolve_source_path(value: Any) -> Path:
+    path = Path(str(value or ""))
+    return path if path.is_absolute() else ROOT / path
 
 
 def filter_by_gender(df_meta: pd.DataFrame, selected_gender: str = "전체") -> pd.DataFrame:
@@ -87,7 +93,7 @@ def lazy_crop_item(
     if os.path.exists(cached_path):
         return str(cached_path)
 
-    source_path = Path(str(record.get("original_img_path", record.get("image_path", ""))))
+    source_path = _resolve_source_path(record.get("original_img_path", record.get("image_path", "")))
     if not source_path.is_file():
         return None
 
@@ -120,7 +126,7 @@ def lazy_thumbnail_item(
     """
 
     record = dict(item)
-    source_path = Path(str(record.get("original_img_path", record.get("image_path", ""))))
+    source_path = _resolve_source_path(record.get("original_img_path", record.get("image_path", "")))
     if not source_path.is_file():
         return None
 

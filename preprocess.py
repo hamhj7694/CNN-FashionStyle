@@ -236,6 +236,7 @@ def process_aihub_data(
     json_root = Path(json_dir)
     image_root = Path(img_dir)
     output_path = Path(output_csv_path)
+    project_root = Path.cwd().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     records: list[dict[str, Any]] = []
 
@@ -248,6 +249,13 @@ def process_aihub_data(
         image_path = _find_image_path(json_path, image_root, payload)
         if image_path is None:
             continue
+
+        def portable_path(path: Path) -> str:
+            """Store paths relative to the repository for cross-PC use."""
+            try:
+                return path.resolve().relative_to(project_root).as_posix()
+            except ValueError:
+                return path.resolve().as_posix()
 
         image_name = str(_first_value(payload, {K_IMAGE_FILE_NAME, "file_name", "filename"}) or image_path.name)
         image_info = _nested_dict(payload, K_IMAGE_INFO)
@@ -264,8 +272,8 @@ def process_aihub_data(
                 {
                     "id": _safe_id(str(source_id), len(records) + 1),
                     "image_filename": image_name,
-                    "original_img_path": str(image_path),
-                    "original_json_path": str(json_path.resolve()),
+                    "original_img_path": portable_path(image_path),
+                    "original_json_path": portable_path(json_path),
                     "gender": gender,
                     "category": category,
                     "category_detail": category_detail,

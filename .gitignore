@@ -9,7 +9,7 @@ __pycache__/
 CNN_train_test/
 recommend_pool/raw_data/images/
 recommend_pool/raw_data/labels/
-recommend_pool/metadata.csv
+# Portable JSON-derived catalog used by the web app
 recommend_pool/processed_crops/*
 !recommend_pool/processed_crops/.gitkeep
 

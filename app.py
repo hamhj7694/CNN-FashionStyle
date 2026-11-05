@@ -282,6 +282,8 @@ def _as_image_src(source: str) -> str:
     if source.startswith(("http://", "https://", "data:")):
         return source
     path = Path(source)
+    if not path.is_absolute():
+        path = ROOT / path
     if not path.is_file():
         return ""
     mime = mimetypes.guess_type(path.name)[0] or "image/jpeg"
