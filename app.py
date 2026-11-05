@@ -156,7 +156,8 @@ def load_metadata(file_signature: tuple[Any, ...] = ()) -> tuple[pd.DataFrame, b
             return _normalize_metadata(pd.DataFrame(rows)), True
 
     # 정식 metadata CSV가 없어도 준비된 로컬 추천 이미지로 데모 카탈로그를 구성한다.
-    demo_paths = sorted(CROP_DIR.glob("*.jpg"))
+    full_demo_paths = sorted(CROP_DIR.glob("full_*.jpg"))
+    demo_paths = full_demo_paths if len(full_demo_paths) >= 10 else sorted(CROP_DIR.glob("*.jpg"))
     if demo_paths:
         rows = []
         for image_path in demo_paths:
@@ -578,6 +579,24 @@ def main() -> None:
     with right:
         render_analysis_panel(uploaded_file, selected_item, analysis, analysis_error or model_error)
 
+    if analysis and not dataframe.empty:
+        top1_items = _pick_mood_recommendations(
+            dataframe,
+            analysis["mood_scores"],
+            count=5,
+        )["similar"]
+        st.markdown(
+            f'<div class="mf-section"><div><h2>Top Mood Edit</h2>'
+            f'<p>{html.escape(analysis["mood"])} 1순위 무드 의류 랜덤 추천</p></div>'
+            '<span class="mf-pill">TOP 1 · 5 ITEMS</span></div>',
+            unsafe_allow_html=True,
+        )
+        if top1_items:
+            columns = st.columns(5, gap="medium")
+            for index, item in enumerate(top1_items):
+                with columns[index % 5]:
+                    render_card(item, "top1", index)
+
     st.markdown('<div class="mf-section"><div><h2>Explore the edit</h2><p>무드에서 시작해 성별 범위와 의류 분류로 큐레이션을 좁혀보세요.</p></div></div>', unsafe_allow_html=True)
     filter_a, filter_b, filter_c = st.columns([1, 1.25, 1])
     with filter_a:
@@ -587,6 +606,7 @@ def main() -> None:
         if analysis and st.session_state.get("diagnosis_filter_key") != diagnosis_key:
             st.session_state["mood_filter"] = analysis["mood"] if analysis["mood"] in mood_options else "전체"
             st.session_state["diagnosis_filter_key"] = diagnosis_key
+            st.session_state["mood_filter"] = "전체"
         if st.session_state.get("mood_filter", "전체") not in mood_options:
             st.session_state["mood_filter"] = "전체"
         selected_mood = st.selectbox("무드", mood_options, key="mood_filter", label_visibility="collapsed")
