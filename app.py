@@ -609,7 +609,7 @@ def render_selected_recommendation(item: dict[str, Any] | None, show_title: bool
         _full_source(item), viewer_key="selected_image_viewer",
         alt="선택된 추천 착장", frame_class="mf-selected-frame",
     )
-    caption = " · ".join(str(item.get(key, "")) for key in ("category", "mood", "gender") if item.get(key))
+    caption = str(item.get("mood", "미분류"))
     st.markdown(f'<p class="mf-selected-caption">{html.escape(caption)}</p>', unsafe_allow_html=True)
 
 def render_card(item: dict[str, Any], section_key: str, index: int) -> None:
@@ -633,14 +633,13 @@ def render_card(item: dict[str, Any], section_key: str, index: int) -> None:
             on_click=_select_item, args=(item,), use_container_width=True,
         )
 
-    category = html.escape(str(item.get("category", "기타")))
     mood = html.escape(str(item.get("mood", "미분류")))
     score = item.get("similarity")
     score_text = f"유사도 {float(score) * 100:.0f}%" if score is not None else "curated pick"
     if HAS_SHADCN and hasattr(ui, "card"):
         try:
             ui.card(
-                title=f"{category} · {mood}",
+                title=mood,
                 content=f"{score_text} · MoodFit edit",
                 key=f"card_{section_key}_{index}",
             )
@@ -648,7 +647,7 @@ def render_card(item: dict[str, Any], section_key: str, index: int) -> None:
             pass
     else:
         st.markdown(
-            f'<div class="mf-card-copy"><div class="mf-card-meta"><span>{category}</span><span>{score_text}</span></div><div class="mf-card-title">{mood} edit</div></div>',
+            f'<div class="mf-card-copy"><div class="mf-card-meta"><span>{score_text}</span></div><div class="mf-card-title">{mood}</div></div>',
             unsafe_allow_html=True,
         )
 
@@ -885,7 +884,7 @@ def render_catalog_card(item: dict[str, Any], index: int) -> None:
             key=f"select_catalog_{index}", on_click=select_catalog_item, args=(item,),
             use_container_width=True,
         )
-    st.markdown(f'<p class="mf-gallery-copy"><strong>{category}</strong><br>{mood}</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="mf-gallery-copy"><strong>{mood}</strong></p>', unsafe_allow_html=True)
 
 
 def render_catalog(dataframe: pd.DataFrame) -> None:
