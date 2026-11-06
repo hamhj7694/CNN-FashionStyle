@@ -141,13 +141,23 @@ st.markdown(
         .mf-selected-frame { height:420px; }
         .st-key-selected_image_viewer [data-testid="stElementContainer"], .st-key-upload_image_viewer [data-testid="stElementContainer"] { height:420px !important; }
     }
-    .st-key-catalog_grid [data-testid="stHorizontalBlock"] { display:grid !important; grid-template-columns:repeat(10,minmax(0,1fr)); gap:12px !important; }
+    .st-key-catalog_grid [data-testid="stHorizontalBlock"] { display:grid !important; grid-template-columns:repeat(8,minmax(0,1fr)); gap:12px !important; }
     .st-key-catalog_grid [data-testid="stColumn"] { width:100% !important; min-width:0 !important; flex:unset !important; }
+    .st-key-catalog_split .st-key-catalog_grid [data-testid="stHorizontalBlock"] { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .st-key-catalog_split > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child { align-self:stretch !important; }
+    .st-key-catalog_preview { position:sticky; top:4rem; }
+    .st-key-catalog_preview_viewer [data-testid="stElementContainer"] { height:clamp(320px,70vh,760px) !important; }
+    .st-key-catalog_preview_viewer iframe { height:100% !important; width:100%; }
+    .mf-gallery-preview-mood { margin:.6rem 0; color:var(--ink); font-size:1.05rem; }
+    @media (max-width:640px) {
+        .st-key-catalog_split .st-key-catalog_grid [data-testid="stHorizontalBlock"] { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .st-key-catalog_preview { position:static; }
+    }
     .mf-gallery-copy { color:var(--muted); font-size:.74rem; line-height:1.5; margin:.4rem 0 .9rem; overflow-wrap:anywhere; }
     .mf-gallery-copy strong { color:var(--ink); font-weight:500; }
     .mf-gallery-heading h2 { margin:0; font-family:'Playfair Display',Georgia,serif; font-size:2rem; }
     .mf-gallery-heading p { margin:.5rem 0 1.2rem; color:var(--muted); }
-    @media (max-width:900px) { .st-key-catalog_grid [data-testid="stHorizontalBlock"] { grid-template-columns:repeat(5,minmax(0,1fr)); } }
+    @media (max-width:900px) { .st-key-catalog_grid [data-testid="stHorizontalBlock"] { grid-template-columns:repeat(4,minmax(0,1fr)); } }
     @media (max-width:640px) { .st-key-catalog_grid [data-testid="stHorizontalBlock"] { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px !important; } }
     </style>
     """,
@@ -460,9 +470,11 @@ html, body { margin:0; width:100%; height:100%; overflow:hidden; font-family:sys
   function paint() {
     if (!ready) return;
     const scale = base * zoom;
-    // Never drag beyond the image edge into an empty background.
-    x = clamp(x, Math.min(0, width - image.naturalWidth * scale), 0);
-    y = clamp(y, Math.min(0, height - image.naturalHeight * scale), 0);
+    // Center a zoomed-out image on each axis that is smaller than the frame.
+    const renderedWidth = image.naturalWidth * scale;
+    const renderedHeight = image.naturalHeight * scale;
+    x = renderedWidth <= width ? (width - renderedWidth) / 2 : clamp(x, width - renderedWidth, 0);
+    y = renderedHeight <= height ? (height - renderedHeight) / 2 : clamp(y, height - renderedHeight, 0);
     image.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
     zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
   }
@@ -473,7 +485,7 @@ html, body { margin:0; width:100%; height:100%; overflow:hidden; font-family:sys
     width = bounds.width;
     height = bounds.height;
     if (!width || !height) return;
-    // Cover fit: keep aspect ratio and fill the frame at the minimum zoom.
+    // Cover fit: keep the existing 100% startup and reset view.
     base = Math.max(width / image.naturalWidth, height / image.naturalHeight);
     zoom = 1;
     x = (width - image.naturalWidth * base) / 2;
@@ -488,7 +500,7 @@ html, body { margin:0; width:100%; height:100%; overflow:hidden; font-family:sys
 
   function zoomAt(nextZoom, px, py) {
     if (!ready) return;
-    nextZoom = clamp(nextZoom, 1, 6);
+    nextZoom = clamp(nextZoom, 0.25, 6);
     const ratio = nextZoom / zoom;
     // Keep the image point underneath the cursor stationary while zooming.
     x = px - (px - x) * ratio;
@@ -578,7 +590,7 @@ html, body { margin:0; width:100%; height:100%; overflow:hidden; font-family:sys
     )
 
 
-def render_interactive_image(source: str, *, viewer_key: str, alt: str, frame_class: str) -> None:
+def render_interactive_image(source: str, *, viewer_key: str, alt: str, frame_class: str, height: int = 850) -> None:
     image_src = _as_image_src(source)
     if not image_src:
         st.info("이미지를 불러올 수 없습니다. 이미지를 다시 선택해 주세요.")
@@ -587,10 +599,10 @@ def render_interactive_image(source: str, *, viewer_key: str, alt: str, frame_cl
     # Separate iframes keep upload/recommendation zoom and drag independent.
     with st.container(key=viewer_key):
         if hasattr(st, "iframe"):
-            st.iframe(document, height=850, tab_index=0, alt=f"휠로 확대 축소하고 드래그로 이동하는 {alt}")
+            st.iframe(document, height=height, tab_index=0, alt=f"휠로 확대 축소하고 드래그로 이동하는 {alt}")
         else:
             from streamlit.components.v1 import html as component_html
-            component_html(document, height=850, scrolling=False, tab_index=0)
+            component_html(document, height=height, scrolling=False, tab_index=0)
 
 
 def render_selected_recommendation(item: dict[str, Any] | None, show_title: bool = True) -> None:
@@ -800,10 +812,12 @@ def reset_catalog_filters() -> None:
     st.session_state["mood_filter"] = "전체"
     st.session_state["category_filter"] = "전체"
     st.session_state["catalog_page"] = 1
+    st.session_state["catalog_selected_item"] = None
 
 
 def reset_catalog_page() -> None:
     st.session_state["catalog_page"] = 1
+    st.session_state["catalog_selected_item"] = None
 
 
 def open_catalog(mood: str | None = None, category: str | None = None) -> None:
@@ -821,7 +835,11 @@ def close_catalog() -> None:
 
 def select_catalog_item(item: dict[str, Any]) -> None:
     _select_item(item)
-    close_catalog()
+    st.session_state["catalog_selected_item"] = item
+
+
+def close_catalog_preview() -> None:
+    st.session_state["catalog_selected_item"] = None
 
 
 def move_catalog_page(offset: int) -> None:
@@ -870,10 +888,12 @@ def render_catalog_card(item: dict[str, Any], index: int) -> None:
     category = html.escape(str(item.get("category", "기타")))
     mood = html.escape(str(item.get("mood", "미분류")))
     source = _as_image_src(_full_source(item))
+    selected = st.session_state.get("catalog_selected_item") or {}
+    frame_class = "mf-image-frame mf-card-selected" if str(selected.get("id", "")) == str(item.get("id", "")) else "mf-image-frame"
     with st.container(key=f"recommend_pick_catalog_{index}"):
         if source:
             st.markdown(
-                f'<div class="mf-image-frame"><img src="{html.escape(source, quote=True)}" '
+                f'<div class="{frame_class}"><img src="{html.escape(source, quote=True)}" '
                 f'alt="{category} · {mood}" loading="lazy" decoding="async"></div>',
                 unsafe_allow_html=True,
             )
@@ -887,11 +907,32 @@ def render_catalog_card(item: dict[str, Any], index: int) -> None:
     st.markdown(f'<p class="mf-gallery-copy"><strong>{mood}</strong></p>', unsafe_allow_html=True)
 
 
+def render_catalog_grid(rows: pd.DataFrame, page: int, page_size: int, column_count: int) -> None:
+    with st.container(key="catalog_grid"):
+        items = rows.to_dict("records")
+        for row_start in range(0, len(items), column_count):
+            columns = st.columns(column_count, gap="small")
+            for offset, item in enumerate(items[row_start:row_start + column_count]):
+                with columns[offset]:
+                    render_catalog_card(item, (page - 1) * page_size + row_start + offset)
+
+
+def render_catalog_preview(item: dict[str, Any]) -> None:
+    with st.container(key="catalog_preview"):
+        st.button("큰 이미지 닫기 · 8열로 보기", key="close_catalog_preview", on_click=close_catalog_preview)
+        render_interactive_image(
+            _full_source(item), viewer_key="catalog_preview_viewer",
+            alt="전체 보기에서 선택한 착장", frame_class="mf-selected-frame", height=680,
+        )
+        mood = html.escape(str(item.get("mood", "미분류")))
+        st.markdown(f'<p class="mf-gallery-preview-mood">{mood}</p>', unsafe_allow_html=True)
+
+
 def render_catalog(dataframe: pd.DataFrame) -> None:
     st.button("← 추천 화면으로", key="close_catalog", on_click=close_catalog)
     st.markdown(
         '<div class="mf-gallery-heading"><h2>전체 스타일 둘러보기</h2>'
-        '<p>무드와 의류 분류로 찾아보세요. 이미지를 누르면 큰 화면에서 비교할 수 있습니다.</p></div>',
+        '<p>무드와 의류 분류로 찾아보세요. 이미지를 누르면 왼쪽에서 크게 볼 수 있습니다.</p></div>',
         unsafe_allow_html=True,
     )
     mood, category = render_catalog_filters(dataframe)
@@ -913,13 +954,16 @@ def render_catalog(dataframe: pd.DataFrame) -> None:
         st.caption(f"총 {page_count:,}페이지 · 페이지당 {page_size}장")
     with following:
         st.button("다음 →", key="catalog_next", on_click=move_catalog_page, args=(1,), disabled=page == page_count, use_container_width=True)
-    with st.container(key="catalog_grid"):
-        items = rows.to_dict("records")
-        for row_start in range(0, len(items), 10):
-            columns = st.columns(10, gap="small")
-            for offset, item in enumerate(items[row_start:row_start + 10]):
-                with columns[offset]:
-                    render_catalog_card(item, (page - 1) * page_size + row_start + offset)
+    selected = st.session_state.get("catalog_selected_item")
+    if selected:
+        with st.container(key="catalog_split"):
+            preview_column, grid_column = st.columns([1, 1.15], gap="large", vertical_alignment="top")
+            with preview_column:
+                render_catalog_preview(selected)
+            with grid_column:
+                render_catalog_grid(rows, page, page_size, column_count=4)
+    else:
+        render_catalog_grid(rows, page, page_size, column_count=8)
     bottom_left, bottom_right = st.columns(2)
     with bottom_left:
         st.button("← 이전 페이지", key="catalog_previous_bottom", on_click=move_catalog_page, args=(-1,), disabled=page == 1, use_container_width=True)

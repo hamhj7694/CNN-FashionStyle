@@ -111,9 +111,47 @@ class CatalogGalleryUITests(unittest.TestCase):
         self.assertEqual(self.at.selectbox(key='mood_filter').value, '클래식')
         self.at.button(key='select_catalog_0').click().run()
         self.ok()
+        self.assertTrue(self.at.session_state['show_catalog'])
+        self.assertIsNotNone(self.at.session_state['catalog_selected_item'])
+        self.assertEqual(self.at.session_state['upload_signature'], signature)
+        self.at.button(key='close_catalog').click().run()
+        self.ok()
         self.assertFalse(self.at.session_state['show_catalog'])
         self.assertEqual(self.at.session_state['upload_signature'], signature)
         self.assertIsNotNone(self.at.session_state['selected_item'])
+
+    def test_select_switch_and_close_preview_stay_in_gallery(self):
+        self.at.button(key='more_catalog').click().run()
+        self.at.button(key='select_catalog_0').click().run()
+        self.ok()
+        first_id = self.at.session_state['catalog_selected_item']['id']
+        self.assertTrue(self.at.session_state['show_catalog'])
+        self.at.button(key='select_catalog_1').click().run()
+        self.ok()
+        self.assertNotEqual(self.at.session_state['catalog_selected_item']['id'], first_id)
+        self.assertEqual(self.at.number_input(key='catalog_page').value, 1)
+        self.at.button(key='close_catalog_preview').click().run()
+        self.ok()
+        self.assertIsNone(self.at.session_state['catalog_selected_item'])
+        self.assertTrue(self.at.session_state['show_catalog'])
+        self.assertEqual(sum(b.key.startswith('select_catalog_') for b in self.at.button), 60)
+
+    def test_preview_survives_page_change_and_clears_on_filter_change(self):
+        self.at.button(key='more_catalog').click().run()
+        self.at.button(key='select_catalog_0').click().run()
+        selected_id = self.at.session_state['catalog_selected_item']['id']
+        self.at.button(key='catalog_next').click().run()
+        self.ok()
+        self.assertEqual(self.at.number_input(key='catalog_page').value, 2)
+        self.assertEqual(self.at.session_state['catalog_selected_item']['id'], selected_id)
+        self.at.button(key='select_catalog_60').click().run()
+        self.ok()
+        self.assertNotEqual(self.at.session_state['catalog_selected_item']['id'], selected_id)
+        self.at.selectbox(key='mood_filter').select('클래식').run()
+        self.ok()
+        self.assertIsNone(self.at.session_state['catalog_selected_item'])
+        self.assertEqual(self.at.number_input(key='catalog_page').value, 1)
+        self.assertTrue(self.at.session_state['show_catalog'])
 
     def test_page_input_clamps_when_result_count_changes(self):
         self.at.button(key='more_catalog').click().run()
