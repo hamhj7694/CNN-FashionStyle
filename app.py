@@ -141,6 +141,14 @@ st.markdown(
         .mf-selected-frame { height:420px; }
         .st-key-selected_image_viewer [data-testid="stElementContainer"], .st-key-upload_image_viewer [data-testid="stElementContainer"] { height:420px !important; }
     }
+    .st-key-catalog_grid [data-testid="stHorizontalBlock"] { display:grid !important; grid-template-columns:repeat(10,minmax(0,1fr)); gap:12px !important; }
+    .st-key-catalog_grid [data-testid="stColumn"] { width:100% !important; min-width:0 !important; flex:unset !important; }
+    .mf-gallery-copy { color:var(--muted); font-size:.74rem; line-height:1.5; margin:.4rem 0 .9rem; overflow-wrap:anywhere; }
+    .mf-gallery-copy strong { color:var(--ink); font-weight:500; }
+    .mf-gallery-heading h2 { margin:0; font-family:'Playfair Display',Georgia,serif; font-size:2rem; }
+    .mf-gallery-heading p { margin:.5rem 0 1.2rem; color:var(--muted); }
+    @media (max-width:900px) { .st-key-catalog_grid [data-testid="stHorizontalBlock"] { grid-template-columns:repeat(5,minmax(0,1fr)); } }
+    @media (max-width:640px) { .st-key-catalog_grid [data-testid="stHorizontalBlock"] { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px !important; } }
     </style>
     """,
     unsafe_allow_html=True,
@@ -792,6 +800,132 @@ def catalog_filter_options(dataframe: pd.DataFrame, column: str) -> list[str]:
 def reset_catalog_filters() -> None:
     st.session_state["mood_filter"] = "전체"
     st.session_state["category_filter"] = "전체"
+    st.session_state["catalog_page"] = 1
+
+
+def reset_catalog_page() -> None:
+    st.session_state["catalog_page"] = 1
+
+
+def open_catalog(mood: str | None = None, category: str | None = None) -> None:
+    if mood is not None:
+        st.session_state["mood_filter"] = mood
+    if category is not None:
+        st.session_state["category_filter"] = category
+    reset_catalog_page()
+    st.session_state["show_catalog"] = True
+
+
+def close_catalog() -> None:
+    st.session_state["show_catalog"] = False
+
+
+def select_catalog_item(item: dict[str, Any]) -> None:
+    _select_item(item)
+    close_catalog()
+
+
+def move_catalog_page(offset: int) -> None:
+    st.session_state["catalog_page"] = max(1, st.session_state.get("catalog_page", 1) + offset)
+
+
+def catalog_image_page(
+    dataframe: pd.DataFrame, mood: str, category: str, page: int = 1, page_size: int = 60,
+) -> tuple[pd.DataFrame, int, int]:
+    """Filter before deduplicating photos, then paginate a stable mixed order."""
+    if page_size < 1:
+        raise ValueError("page_size must be positive")
+    images = filter_catalog(dataframe, "전체", category, mood).reset_index(drop=True).copy()
+    image_keys = pd.Series("", index=images.index, dtype="object")
+    for field in ("full_image_url", "full_image_path", "original_img_path", "image_url", "crop_image_path"):
+        if field in images:
+            values = images[field].fillna("").astype(str).str.strip()
+            image_keys = image_keys.mask(image_keys.eq(""), values)
+    fallback = images["id"].astype(str) if "id" in images else images.index.astype(str)
+    images["_catalog_image_key"] = image_keys.mask(image_keys.eq(""), "item:" + pd.Series(fallback, index=images.index))
+    images = images.drop_duplicates("_catalog_image_key").sample(frac=1, random_state=42)
+    total = len(images)
+    last_page = max(1, (total + page_size - 1) // page_size)
+    page = min(max(1, int(page)), last_page)
+    start = (page - 1) * page_size
+    return images.iloc[start:start + page_size].drop(columns="_catalog_image_key"), total, page
+
+
+def render_catalog_filters(dataframe: pd.DataFrame) -> tuple[str, str]:
+    mood_options = catalog_filter_options(dataframe, "mood")
+    category_options = catalog_filter_options(dataframe, "category")
+    for key, options in (("mood_filter", mood_options), ("category_filter", category_options)):
+        if st.session_state.get(key, "전체") not in options:
+            st.session_state[key] = "전체"
+    filter_mood, filter_category, filter_actions = st.columns([1, 1, .5], gap="medium", vertical_alignment="bottom")
+    with filter_mood:
+        selected_mood = st.selectbox("무드", mood_options, key="mood_filter", disabled=dataframe.empty, on_change=reset_catalog_page)
+    with filter_category:
+        selected_category = st.selectbox("의류 분류", category_options, key="category_filter", disabled=dataframe.empty, on_change=reset_catalog_page)
+    with filter_actions:
+        st.button("필터 초기화", key="reset_catalog_filters", on_click=reset_catalog_filters, use_container_width=True, disabled=dataframe.empty)
+    return selected_mood, selected_category
+
+
+def render_catalog_card(item: dict[str, Any], index: int) -> None:
+    category = html.escape(str(item.get("category", "기타")))
+    mood = html.escape(str(item.get("mood", "미분류")))
+    source = _as_image_src(_full_source(item))
+    with st.container(key=f"recommend_pick_catalog_{index}"):
+        if source:
+            st.markdown(
+                f'<div class="mf-image-frame"><img src="{html.escape(source, quote=True)}" '
+                f'alt="{category} · {mood}" loading="lazy" decoding="async"></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown('<div class="mf-image-frame mf-empty">이미지 준비 중</div>', unsafe_allow_html=True)
+        st.button(
+            f"{item.get('category', '착장')} · {item.get('mood', '')} 크게 비교하기",
+            key=f"select_catalog_{index}", on_click=select_catalog_item, args=(item,),
+            use_container_width=True,
+        )
+    st.markdown(f'<p class="mf-gallery-copy"><strong>{category}</strong><br>{mood}</p>', unsafe_allow_html=True)
+
+
+def render_catalog(dataframe: pd.DataFrame) -> None:
+    st.button("← 추천 화면으로", key="close_catalog", on_click=close_catalog)
+    st.markdown(
+        '<div class="mf-gallery-heading"><h2>전체 스타일 둘러보기</h2>'
+        '<p>무드와 의류 분류로 찾아보세요. 이미지를 누르면 큰 화면에서 비교할 수 있습니다.</p></div>',
+        unsafe_allow_html=True,
+    )
+    mood, category = render_catalog_filters(dataframe)
+    page_size = 60
+    rows, total, page = catalog_image_page(dataframe, mood, category, st.session_state.get("catalog_page", 1), page_size)
+    st.session_state["catalog_page"] = page
+    page_count = max(1, (total + page_size - 1) // page_size)
+    start = (page - 1) * page_size + 1 if total else 0
+    end = min(page * page_size, total)
+    st.caption(f"조건에 맞는 이미지 {total:,}장 · {start:,}–{end:,}장 표시 · 중복 사진 제외")
+    if not total:
+        st.info("선택한 조건에 맞는 이미지가 없습니다. 필터를 바꾸거나 초기화해 주세요.")
+        return
+    previous, page_control, following = st.columns([1, 2, 1], vertical_alignment="bottom")
+    with previous:
+        st.button("← 이전", key="catalog_previous", on_click=move_catalog_page, args=(-1,), disabled=page == 1, use_container_width=True)
+    with page_control:
+        st.number_input("페이지", min_value=1, max_value=page_count, step=1, key="catalog_page")
+        st.caption(f"총 {page_count:,}페이지 · 페이지당 {page_size}장")
+    with following:
+        st.button("다음 →", key="catalog_next", on_click=move_catalog_page, args=(1,), disabled=page == page_count, use_container_width=True)
+    with st.container(key="catalog_grid"):
+        items = rows.to_dict("records")
+        for row_start in range(0, len(items), 10):
+            columns = st.columns(10, gap="small")
+            for offset, item in enumerate(items[row_start:row_start + 10]):
+                with columns[offset]:
+                    render_catalog_card(item, (page - 1) * page_size + row_start + offset)
+    bottom_left, bottom_right = st.columns(2)
+    with bottom_left:
+        st.button("← 이전 페이지", key="catalog_previous_bottom", on_click=move_catalog_page, args=(-1,), disabled=page == 1, use_container_width=True)
+    with bottom_right:
+        st.button("다음 페이지 →", key="catalog_next_bottom", on_click=move_catalog_page, args=(1,), disabled=page == page_count, use_container_width=True)
 
 
 def main() -> None:
@@ -800,6 +934,9 @@ def main() -> None:
 
     st.markdown('<div class="mf-nav"><div class="mf-logo">Mood<span>Fit</span> AI</div><div class="mf-nav-note">Editorial intelligence / 2026</div></div>', unsafe_allow_html=True)
 
+    # Keep the uploader mounted so returning from the catalog preserves the photo.
+    if st.session_state.get("show_catalog", False):
+        st.markdown('<style>.st-key-look_workspace {display:none !important;}</style>', unsafe_allow_html=True)
     with st.container(key="look_workspace"):
         # Shared header row: both image previews start below its tallest column.
         left, right = st.columns([1, 1], gap="large")
@@ -876,6 +1013,20 @@ def main() -> None:
                 if selected_item:
                     render_selected_recommendation(selected_item, show_title=False)
 
+    mood_options = catalog_filter_options(dataframe, "mood")
+    category_options = catalog_filter_options(dataframe, "category")
+    diagnosis_key = (upload_signature, model.checkpoint_sha256) if analysis else None
+    previous_diagnosis = st.session_state.get("diagnosis_filter_key")
+    if analysis and previous_diagnosis != diagnosis_key:
+        st.session_state["mood_filter"] = analysis["mood"] if analysis["mood"] in mood_options else "전체"
+        st.session_state["diagnosis_filter_key"] = diagnosis_key
+    elif not analysis and previous_diagnosis is not None:
+        st.session_state["mood_filter"] = "전체"
+        st.session_state["diagnosis_filter_key"] = None
+    if st.session_state.get("show_catalog", False):
+        render_catalog(dataframe)
+        return
+
     if analysis and not dataframe.empty:
         st.markdown(
             f'<div class="mf-section"><div><h2>Top Mood Edit</h2>'
@@ -891,30 +1042,14 @@ def main() -> None:
         else:
             st.info("진단된 무드에 해당하는 추천 아이템이 아직 없습니다. 아래 필터에서 다른 무드를 선택해 주세요.")
 
+    if analysis and not dataframe.empty:
+        st.button("더보기 · 진단된 무드 전체", key="more_top_mood", on_click=open_catalog, args=(analysis["mood"], "전체"))
+
     st.divider()
 
     st.markdown('<div class="mf-section"><div><h2>Explore the edit</h2><p>무드와 의류 분류를 선택해 아래 추천 목록을 좁혀보세요.</p></div></div>', unsafe_allow_html=True)
-    mood_options = catalog_filter_options(dataframe, "mood")
-    category_options = catalog_filter_options(dataframe, "category")
-    diagnosis_key = (upload_signature, model.checkpoint_sha256) if analysis else None
-    previous_diagnosis = st.session_state.get("diagnosis_filter_key")
-    if analysis and previous_diagnosis != diagnosis_key:
-        st.session_state["mood_filter"] = analysis["mood"] if analysis["mood"] in mood_options else "전체"
-        st.session_state["diagnosis_filter_key"] = diagnosis_key
-    elif not analysis and previous_diagnosis is not None:
-        st.session_state["mood_filter"] = "전체"
-        st.session_state["diagnosis_filter_key"] = None
-    for key, options in (("mood_filter", mood_options), ("category_filter", category_options)):
-        if st.session_state.get(key, "전체") not in options:
-            st.session_state[key] = "전체"
-
-    filter_mood, filter_category, filter_actions = st.columns([1, 1, .5], gap="medium", vertical_alignment="bottom")
-    with filter_mood:
-        selected_mood = st.selectbox("무드", mood_options, key="mood_filter", disabled=dataframe.empty)
-    with filter_category:
-        selected_category = st.selectbox("의류 분류", category_options, key="category_filter", disabled=dataframe.empty)
-    with filter_actions:
-        st.button("필터 초기화", key="reset_catalog_filters", on_click=reset_catalog_filters, use_container_width=True, disabled=dataframe.empty)
+    selected_mood, selected_category = render_catalog_filters(dataframe)
+    st.button("더보기 · 전체 스타일 보기", key="more_catalog", on_click=open_catalog, disabled=dataframe.empty)
 
     if is_demo_data:
         st.info("현재는 로컬 이미지 폴더를 사용하는 데모 카탈로그입니다. AI Hub JSON 라벨과 metadata가 준비되면 정식 분류로 전환됩니다.")
@@ -953,6 +1088,8 @@ def main() -> None:
     else:
         st.markdown('<div class="mf-empty">현재 조건에 맞는 추천 아이템이 없습니다.</div>', unsafe_allow_html=True)
 
+    st.button("더보기 · 같은 조건의 전체 이미지", key="more_similar", on_click=open_catalog)
+
     st.markdown('<div class="mf-section"><div><h2>Trending Discovery</h2><p>같은 무드·의류 분류 조건에서 새롭게 발견한 아이템</p></div><span class="mf-pill">TOP 5</span></div>', unsafe_allow_html=True)
     discovery_items = sections["discovery"]
     if discovery_items:
@@ -962,6 +1099,8 @@ def main() -> None:
                 render_card(item, "discovery", index)
     else:
         st.markdown('<div class="mf-empty">디스커버리 아이템이 없습니다.</div>', unsafe_allow_html=True)
+
+    st.button("더보기 · 스타일 더 찾아보기", key="more_discovery", on_click=open_catalog)
 
 
 if __name__ == "__main__":
